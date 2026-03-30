@@ -161,8 +161,10 @@
     ;; Checkpoint F: past segment setup
     (mov-rdi-word 16 #x0b46)      ; 'F' at VGA col 8
 
-    ;; Write "Long mode OK" to VGA
-    ,@(pm-vga-forms *lm-message* :row 0 :col 0 :attr #x0a)  ; bright green
+    ;; Write "Long mode OK" to VGA using RDI-relative writes (safe in 64-bit)
+    ,@(loop for ch across *lm-message*
+            for i from 0
+            collect `(mov-rdi-word ,(* 2 i) ,(logior (char-code ch) #x0a00)))
 
     ;; Halt
     (hlt)))

@@ -174,13 +174,12 @@
      (or (gethash expr labels)
          (error "Undefined label in expression: ~a" expr)))
     ((listp expr)
-     (let ((op  (first expr))
-           (a   (eval-expr (second expr) labels))
-           (b   (when (third expr) (eval-expr (third expr) labels))))
+     (let ((op   (first expr))
+           (args (mapcar (lambda (x) (eval-expr x labels)) (rest expr))))
        (case op
-         (+ (+ a b))
-         (- (if b (- a b) (- a)))
-         (* (* a b))
+         (+ (reduce #'+ args))
+         (- (if (cdr args) (reduce #'- args) (- (car args))))
+         (* (reduce #'* args))
          (t (error "Unknown expression operator: ~a" op)))))
     (t (error "Cannot evaluate expression: ~a" expr))))
 

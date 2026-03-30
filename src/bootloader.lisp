@@ -1,34 +1,87 @@
-;;;; bootloader.lisp — Stage 1 + Stage 2 bootloader definition
+;;;; bootloader.lisp — Stage 1 MBR bootloader
 ;;;;
-;;;; Written as Lisp s-expressions representing x86 assembly.
-;;;; The assembler (assembler.lisp) will translate these into
-;;;; a bootable floppy image.
+;;;; 16-bit real mode. Prints a minimal boot message via BIOS INT 10h,
+;;;; then halts. The real Ecclesia banner is printed by boot.lisp once
+;;;; the SBCL kernel is running.
 ;;;;
-;;;; Boot sequence:
-;;;;   1. BIOS loads 512-byte MBR at 0x7C00 (16-bit real mode)
-;;;;   2. Stage 1 loads stage 2 from floppy sectors
-;;;;   3. Stage 2 enters 32-bit protected mode -> 64-bit long mode
-;;;;   4. Control is handed to the Lisp kernel
+;;;; Memory layout at 0x7C00:
+;;;;
+;;;;   [code: setup + print loop]   ← BIOS jumps here
+;;;;   [boot string, null-term]     ← SI points here
+;;;;   [zero padding to offset 510]
+;;;;   [0x55 0xAA]                  ← boot signature
 
 (in-package #:ecclesia)
 
-(defparameter *bootloader*
-  '(;; ===== Stage 1: 16-bit real mode MBR =====
-    (bits 16)
-    (org  #x7c00)
+(defparameter *boot-message*
+  (concatenate 'string
+    (string #\Return) (string #\Newline)
+    "Ecclesia booting..."
+    (string #\Return) (string #\Newline)))
 
-    ;; Initialise segments and stack
-    (cli)
-    (xor ax ax)
-    (mov ds ax)
-    (mov es ax)
-    (mov ax #x7000)
-    (mov ss ax)
-    (mov sp #xff00)
-    (sti)
+(defun boot-message-db-forms ()
+  "Return DB forms for *boot-message* plus a null terminator."
+  (append (loop for c across *boot-message* collect `(db ,(char-code c)))
+          '((db 0))))
 
-    ;; TODO: Load stage 2 from floppy (INT 13h)
+;;; Code layout byte sizes:
+;;;   CLI             1
+;;;   XOR AX,AX       2
+;;;   MOV DS,AX       2
+;;;   MOV ES,AX       2
+;;;   MOV SS,AX       2
+;;;   MOV SP,#x7c00   3
+;;;   STI             1
+;;;   MOV SI,<imm16>  3
+;;;   MOV AH,#x0e     2
+;;;   MOV BH,#x00     2
+;;; .print_loop:
+;;;   LODSB           1
+;;;   TEST AL,AL      2
+;;;   JZ .done        2
+;;;   INT #x10        2
+;;;   JNZ .print_loop 2
+;;; .done:
+;;;   HLT             1
+;;; Total:           30
 
-    ;; Boot sector padding + signature
-    (times (- 510 (- $ $$)) db 0)
-    (dw #xaa55)))
+(defconstant +code-size+ 30)
+
+(defun make-bootloader ()
+  (let* ((msg-forms  (boot-message-db-forms))
+         (msg-size   (length msg-forms))
+         (msg-addr   (+ #x7c00 +code-size+))
+         (pad-size   (- 512 2 +code-size+ msg-size)))
+    (when (< pad-size 0)
+      (error "Bootloader too large: code ~d + message ~d = ~d > 510"
+             +code-size+ msg-size (+ +code-size+ msg-size)))
+    `((bits 16)
+      (org  #x7c00)
+
+      (cli)
+      (xor  ax ax)
+      (mov  ds ax)
+      (mov  es ax)
+      (mov  ss ax)
+      (mov  sp #x7c00)
+      (sti)
+
+      (mov  si ,msg-addr)
+      (mov  ah #x0e)
+      (mov  bh #x00)
+
+      (label print-loop)
+      (lodsb)
+      (test  al al)
+      (jz    done)
+      (int   #x10)
+      (jnz   print-loop)
+
+      (label done)
+      (hlt)
+
+      ,@msg-forms
+      (times ,pad-size db 0)
+      (dw #xaa55))))
+
+(defparameter *bootloader* (make-bootloader))

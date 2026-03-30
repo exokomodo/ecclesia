@@ -55,6 +55,10 @@
 (defparameter *sreg-encoding*
   '((es . 0) (cs . 1) (ss . 2) (ds . 3) (fs . 4) (gs . 5)))
 
+(defparameter *r64-encoding*
+  '((rax . 0) (rcx . 1) (rdx . 2) (rbx . 3)
+    (rsp . 4) (rbp . 5) (rsi . 6) (rdi . 7)))
+
 (defparameter *creg-encoding*
   '((cr0 . 0) (cr2 . 2) (cr3 . 3) (cr4 . 4)))
 
@@ -67,8 +71,11 @@
 (defun r8-p   (s) (not (null (assoc s *r8-encoding*))))
 (defun r16-p  (s) (not (null (assoc s *r16-encoding*))))
 (defun r32-p  (s) (not (null (assoc s *r32-encoding*))))
+(defun r64-p  (s) (not (null (assoc s *r64-encoding*))))
 (defun sreg-p (s) (not (null (assoc s *sreg-encoding*))))
 (defun creg-p (s) (not (null (assoc s *creg-encoding*))))
+
+(defun r64-enc (r) (or (cdr (assoc r *r64-encoding*)) (error "Unknown r64: ~a" r)))
 
 ;;; ── Instruction size estimation (pass 1) ────────────────────────────────────
 
@@ -81,10 +88,14 @@
       (dd    4)
       (dq    8)
       (times (destructuring-bind (n db-op byte) args (declare (ignore db-op byte)) n))
-      ((cli sti hlt lodsb lodsw rdmsr wrmsr) 1)
+      ((cli sti hlt lodsb lodsw rdmsr wrmsr stosd stosb movsd movsb) 1)
+      (rep   (1+ (instruction-size (list (first args)))))
       (int   2)
       ((test jz jnz jc jnc) 2)
-      (xor   2)
+      ;; XOR r16,r16 = 2; XOR r32,r32 = 2; XOR r32,r32 (with REX) = 3 (we skip REX for now)
+      (xor   (if (r32-p (first args)) 2 2))
+      ;; MOV [imm32], r32 = 6 (opcode + ModRM + disp32)
+      ;; MOV [imm32], imm32 handled in mov size below
       (mov
        (let ((dst (first args)) (src (second args)))
          (cond
@@ -103,6 +114,12 @@
            ((and (r32-p dst) (numberp src)) 5)
            ;; MOV r32, r32
            ((and (r32-p dst) (r32-p src)) 2)
+           ;; MOV [imm32], r32  →  6 bytes (0x89 ModRM disp32)
+           ((and (listp dst) (eq (car dst) 'mem32) (r32-p src)) 6)
+           ;; MOV [imm32], imm32  →  10 bytes (0xc7 /0 disp32 imm32)
+           ((and (listp dst) (eq (car dst) 'mem32) (numberp src)) 10)
+           ;; MOV r64, imm64  →  REX.W(1) + 0xb8+r + imm64 = 10 bytes
+           ((and (r64-p dst) (numberp src)) 10)
            (t (error "Unknown MOV size: ~a ~a" dst src)))))
       (or
        (let ((dst (first args)) (src (second args)))
@@ -112,7 +129,9 @@
            ;; OR r32, r32
            ((and (r32-p dst) (r32-p src)) 2)
            (t (error "Unknown OR size: ~a ~a" dst src)))))
-      (lgdt  4)   ; 0x0f 0x01 /2  ModRM + 16-bit offset (disp16)
+      (lgdt  4)
+      ;; IN AL, imm8  →  2 bytes
+      (in    2)
       (jmp
        (cond
          ((eq (first args) 'far)   5)  ; 0xea offset16 seg16  (real/pm)
@@ -190,15 +209,31 @@
         (hlt    (push-byte #xf4))
         (lodsb  (push-byte #xac))
         (lodsw  (push-byte #xad))
+        (stosd  (push-byte #xab))
+        (stosb  (push-byte #xaa))
+        (movsd  (push-byte #xa5))
+        (movsb  (push-byte #xa4))
         (rdmsr  (push-byte #x0f) (push-byte #x32))
         (wrmsr  (push-byte #x0f) (push-byte #x30))
 
-        ;; XOR r16, r16  →  0x31 /r
+        ;; REP prefix  →  0xF3 + following instruction
+        (rep
+         (push-byte #xf3)
+         (emit-instruction (list (first args)) labels origin buf))
+
+        ;; XOR r16,r16 → 0x31 /r   XOR r32,r32 → 0x31 /r (same opcode, 32-bit default in PM)
         (xor
-         (let ((dst (r16-enc (first args)))
-               (src (r16-enc (second args))))
-           (push-byte #x31)
-           (push-byte (logior #xc0 (ash src 3) dst))))
+         (cond
+           ((r32-p (first args))
+            (let ((dst (r32-enc (first args)))
+                  (src (r32-enc (second args))))
+              (push-byte #x31)
+              (push-byte (logior #xc0 (ash src 3) dst))))
+           (t
+            (let ((dst (r16-enc (first args)))
+                  (src (r16-enc (second args))))
+              (push-byte #x31)
+              (push-byte (logior #xc0 (ash src 3) dst))))))
 
         ;; TEST AL, AL  →  0x84 0xC0
         (test
@@ -241,6 +276,22 @@
              ((and (r32-p dst) (r32-p src))
               (push-byte #x89)
               (push-byte (logior #xc0 (ash (r32-enc src) 3) (r32-enc dst))))
+             ;; MOV [imm32], r32  →  0x89 /r  mod=00 r/m=5 disp32
+             ((and (listp dst) (eq (car dst) 'mem32) (r32-p src))
+              (push-byte #x89)
+              (push-byte (logior #x05 (ash (r32-enc src) 3)))
+              (push-u32 (eval-expr (second dst) labels)))
+             ;; MOV [imm32], imm32  →  0xc7 /0  mod=00 r/m=5 disp32 imm32
+             ((and (listp dst) (eq (car dst) 'mem32) (numberp src))
+              (push-byte #xc7)
+              (push-byte #x05)   ; mod=00, reg=0, r/m=5
+              (push-u32 (eval-expr (second dst) labels))
+              (push-u32 src))
+             ;; MOV r64, imm64  →  REX.W 0xb8+r imm64
+             ((and (r64-p dst) (numberp src))
+              (push-byte #x48)   ; REX.W prefix
+              (push-byte (+ #xb8 (r64-enc dst)))
+              (push-u64 src))
              (t (error "Unsupported MOV: ~a ~a" dst src)))))
 
         ;; OR r32, imm32  →  0x81 /1 imm32
@@ -292,6 +343,12 @@
                 (rel (- tgt (+ (cur-addr) 2))))
            (unless (<= -128 rel 127) (error "JNC out of range"))
            (push-byte #x73) (push-byte (logand rel #xff))))
+
+        ;; IN AL, imm8  →  0xe4 imm8
+        (in
+         (when (eq (first args) 'al)
+           (push-byte #xe4)
+           (push-byte (logand (second args) #xff))))
 
         ;; INT imm8
         (int

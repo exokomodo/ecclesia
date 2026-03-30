@@ -6,5 +6,5 @@
            #:assemble
            #:*bootloader*
            #:+code-size+
-           #:banner-db-forms
-           #:*banner*))
+           #:boot-message-db-forms
+           #:*boot-message*))

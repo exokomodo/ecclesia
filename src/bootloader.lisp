@@ -1,37 +1,30 @@
 ;;;; bootloader.lisp — Stage 1 MBR bootloader
 ;;;;
-;;;; 16-bit real mode. Prints the Ecclesia banner via BIOS INT 10h (TTY mode),
-;;;; then halts. Assembled into a 512-byte MBR image by assembler.lisp.
+;;;; 16-bit real mode. Prints a minimal boot message via BIOS INT 10h,
+;;;; then halts. The real Ecclesia banner is printed by boot.lisp once
+;;;; the SBCL kernel is running.
 ;;;;
 ;;;; Memory layout at 0x7C00:
 ;;;;
 ;;;;   [code: setup + print loop]   ← BIOS jumps here
-;;;;   [banner string, null-term]   ← SI points here
+;;;;   [boot string, null-term]     ← SI points here
 ;;;;   [zero padding to offset 510]
-;;;;   [0x55 0xAA]                  ← boot signature at bytes 510-511
-;;;;
-;;;; The code must fit before the banner string. We compute the banner's
-;;;; load address as (0x7C00 + code-size) and load it into SI.
+;;;;   [0x55 0xAA]                  ← boot signature
 
 (in-package #:ecclesia)
 
-(defparameter *banner*
+(defparameter *boot-message*
   (concatenate 'string
     (string #\Return) (string #\Newline)
-    "  ___         _           _     " (string #\Return) (string #\Newline)
-    " | __| __ __ | | ___  ___(_) __ " (string #\Return) (string #\Newline)
-    " | _|  \\ V / | |/ -_)(_-/| |/ _|" (string #\Return) (string #\Newline)
-    " |___|  \\_/  |_|\\___|/__/|_|\\__|" (string #\Return) (string #\Newline)
-    (string #\Return) (string #\Newline)
-    "  A Lisp OS for the ages." (string #\Return) (string #\Newline)
+    "Ecclesia booting..."
     (string #\Return) (string #\Newline)))
 
-(defun banner-db-forms ()
-  "Return a list of (db <byte>) forms for *banner* plus a null terminator."
-  (append (loop for c across *banner* collect `(db ,(char-code c)))
+(defun boot-message-db-forms ()
+  "Return DB forms for *boot-message* plus a null terminator."
+  (append (loop for c across *boot-message* collect `(db ,(char-code c)))
           '((db 0))))
 
-;;; Code layout (byte sizes):
+;;; Code layout byte sizes:
 ;;;   CLI             1
 ;;;   XOR AX,AX       2
 ;;;   MOV DS,AX       2
@@ -39,34 +32,32 @@
 ;;;   MOV SS,AX       2
 ;;;   MOV SP,#x7c00   3
 ;;;   STI             1
-;;;   MOV SI,<imm16>  3   ← load banner address into SI
-;;;   MOV AH,#x0e     3   ← BIOS TTY subfunction (outside loop, constant)
-;;;   MOV BH,#x00     3   ← page number 0
+;;;   MOV SI,<imm16>  3
+;;;   MOV AH,#x0e     2
+;;;   MOV BH,#x00     2
 ;;; .print_loop:
-;;;   LODSB           1   ← AL = [DS:SI], SI++
-;;;   TEST AL,AL      2   ← null terminator?
-;;;   JZ .done        2   ← yes → stop
-;;;   INT #x10        2   ← BIOS print AL
-;;;   JNZ .print_loop 2   ← loop (JNZ because TEST set ZF=0)
+;;;   LODSB           1
+;;;   TEST AL,AL      2
+;;;   JZ .done        2
+;;;   INT #x10        2
+;;;   JNZ .print_loop 2
 ;;; .done:
-;;;   HLT             1   ← halt
-;;; Total code bytes  = 1+2+2+2+2+3+1+3+3+3+1+2+2+2+2+1 = 32
+;;;   HLT             1
+;;; Total:           30
 
 (defconstant +code-size+ 30)
 
 (defun make-bootloader ()
-  (let* ((banner-addr (+ #x7c00 +code-size+))
-         (banner-forms (banner-db-forms))
-         (banner-size  (length banner-forms))
-         ;; 512 total - 2 for boot signature - code - banner
-         (pad-size     (- 512 2 +code-size+ banner-size)))
+  (let* ((msg-forms  (boot-message-db-forms))
+         (msg-size   (length msg-forms))
+         (msg-addr   (+ #x7c00 +code-size+))
+         (pad-size   (- 512 2 +code-size+ msg-size)))
     (when (< pad-size 0)
-      (error "Bootloader too large: code ~d + banner ~d = ~d > 510"
-             +code-size+ banner-size (+ +code-size+ banner-size)))
+      (error "Bootloader too large: code ~d + message ~d = ~d > 510"
+             +code-size+ msg-size (+ +code-size+ msg-size)))
     `((bits 16)
       (org  #x7c00)
 
-      ;; Initialise segments and stack
       (cli)
       (xor  ax ax)
       (mov  ds ax)
@@ -75,31 +66,22 @@
       (mov  sp #x7c00)
       (sti)
 
-      ;; SI = address of banner string (immediately after this code)
-      (mov  si ,banner-addr)
-
-      ;; AH = 0Eh (BIOS TTY output), BH = page 0
+      (mov  si ,msg-addr)
       (mov  ah #x0e)
       (mov  bh #x00)
 
-      ;; Print loop
       (label print-loop)
-      (lodsb)                      ; AL = *SI, SI++
-      (test  al al)                ; set flags on AL
-      (jz    done)                 ; null terminator → stop
-      (int   #x10)                 ; BIOS: print AL
-      (jnz   print-loop)           ; loop
+      (lodsb)
+      (test  al al)
+      (jz    done)
+      (int   #x10)
+      (jnz   print-loop)
 
       (label done)
       (hlt)
 
-      ;; Inline banner string
-      ,@banner-forms
-
-      ;; Pad to 510 bytes
+      ,@msg-forms
       (times ,pad-size db 0)
-
-      ;; Boot signature
       (dw #xaa55))))
 
 (defparameter *bootloader* (make-bootloader))

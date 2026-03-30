@@ -27,6 +27,26 @@
         for addr = (+ #xb8000 (* 2 (+ (* row 80) c)))
         collect `(mov (mem32 ,addr) ,(logior (char-code ch) (ash attr 8)))))
 
+(defun pm-vga-status-forms (msg &key (row 0) (ok t))
+  "Write a Linux-style status line to VGA row ROW:
+     [  OK  ] msg    or    [ FAIL ] msg"
+  (let* ((bracket-attr #x08)          ; dark grey brackets
+         (ok-attr      #x0a)          ; bright green OK
+         (fail-attr    #x0c)          ; bright red FAIL
+         (msg-attr     #x07)          ; light grey message
+         (status       (if ok "  OK  " " FAIL "))
+         (status-attr  (if ok ok-attr fail-attr))
+         (line         (concatenate 'string "[" status "] " msg)))
+    (append
+     ;; "[" in dark grey
+     (pm-vga-forms "[" :row row :col 0 :attr bracket-attr)
+     ;; status text in green/red
+     (pm-vga-forms status :row row :col 1 :attr status-attr)
+     ;; "]" in dark grey
+     (pm-vga-forms "]" :row row :col 7 :attr bracket-attr)
+     ;; message in light grey
+     (pm-vga-forms (concatenate 'string " " msg) :row row :col 8 :attr msg-attr))))
+
 (defun page-table-forms ()
   "Write identity-mapped page tables in 32-bit PM.
    Maps first 16MB as 8 × 2MB huge pages — covers VGA at 0xB8000.
@@ -122,23 +142,23 @@
     ;; Clear screen first
     ,@(vga-clear-forms)
 
-    ;; Row 0: "Ecclesia booting..." header
-    ,@(pm-vga-forms "Ecclesia" :row 0 :col 0 :attr #x0e)  ; yellow
+    ;; Row 0: header
+    ,@(pm-vga-forms "Ecclesia OS" :row 0 :col 0 :attr #x0e)  ; yellow
 
-    ;; Row 1: "32-bit protected mode OK"
-    ,@(pm-vga-forms "32-bit protected mode OK" :row 1 :col 0 :attr #x0f)
+    ;; Row 1: protected mode
+    ,@(pm-vga-status-forms "Entered 32-bit protected mode" :row 1)
 
     ;; Build page tables
     ,@(page-table-forms)
 
-    ;; Row 2: "Page tables OK"
-    ,@(pm-vga-forms "Page tables OK" :row 2 :col 0 :attr #x0f)
+    ;; Row 2: page tables
+    ,@(pm-vga-status-forms "Identity-mapped page tables (16MB)" :row 2)
 
     ;; Enter long mode
     ,@(long-mode-entry-forms)
 
-    ;; Row 3: "Paging enabled" (written from 32-bit PM after CR0.PG)
-    ,@(pm-vga-forms "Paging enabled" :row 3 :col 0 :attr #x0f)
+    ;; Row 3: paging + long mode activation
+    ,@(pm-vga-status-forms "PAE + EFER.LME + paging enabled" :row 3)
 
     ;; ===== 64-bit long mode =====
     (bits 64)
@@ -152,12 +172,25 @@
     (mov  es ax)
     (mov  ss ax)
 
-    ;; Row 4: "Long mode OK" in bright green
-    ,@(let ((row 4))
-        (loop for ch across *lm-message*
+    ;; Row 4: long mode status line using RDI-relative writes
+    ,@(let* ((row      4)
+             (ok-str   "[  OK  ] Entered 64-bit long mode")
+             ;; bracket + status colours baked per-char
+             (chars    (concatenate 'list
+                         (list (cons #x08 #x5b))          ; '[' dark grey
+                         (list (cons #x0a #x20))           ; ' ' green
+                         (list (cons #x0a #x20))           ; ' '
+                         (list (cons #x0a #x4f))           ; 'O' green
+                         (list (cons #x0a #x4b))           ; 'K' green
+                         (list (cons #x0a #x20))           ; ' '
+                         (list (cons #x0a #x20))           ; ' '
+                         (list (cons #x08 #x5d))           ; ']' dark grey
+                         (mapcar (lambda (c) (cons #x07 (char-code c)))
+                                 (coerce " Entered 64-bit long mode" 'list)))))
+        (loop for (attr . code) in chars
               for i from 0
               collect `(mov-rdi-word ,(+ (* row 80 2) (* 2 i))
-                                     ,(logior (char-code ch) #x0a00))))
+                                     ,(logior code (ash attr 8)))))
 
     ;; Halt
     (hlt)))

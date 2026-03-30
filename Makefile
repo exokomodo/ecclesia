@@ -55,10 +55,24 @@ boot: build ## Build and boot in QEMU
 	@echo "[+] Launching in QEMU..."
 	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio
 
+.PHONY: boot-once
+boot-once: build ## Boot in QEMU, halt instead of reboot on triple fault
+	@echo "[+] Launching in QEMU (no-reboot)..."
+	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio -no-reboot -no-shutdown
+
 .PHONY: debug
 debug: build ## Build and boot in QEMU with GDB support
 	@echo "[+] Launching in QEMU (GDB on :1234)..."
 	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio -s -S
+
+.PHONY: debug-log
+debug-log: build ## Boot with CPU exception logging to /tmp/qemu.log
+	@echo "[+] Launching in QEMU (logging to /tmp/qemu.log)..."
+	$(QEMU) -fda $(FLOPPY) -m 32 -no-reboot -no-shutdown \
+	        -d int,cpu_reset,cpu -D /tmp/qemu.log 2>/dev/null & \
+	sleep 3 && kill %1 2>/dev/null; \
+	echo "[+] Last entries in /tmp/qemu.log:"; \
+	tail -60 /tmp/qemu.log
 
 .PHONY: test
 test: test/unit ## Run tests

@@ -11,7 +11,16 @@
            #:+code-size+
            #:boot-message-db-forms
            #:*boot-message*
+           #:+vga-base+
+           #:+vga-cols+
+           #:vga-addr
+           #:vga-offset
+           #:vga-cell
            #:vga-clear-forms
+           #:pm-vga-forms
+           #:pm-vga-status-forms
+           #:lm-vga-forms
+           #:lm-vga-status-forms
            #:*stage2*
            #:stage2-size
            #:*kernel64*

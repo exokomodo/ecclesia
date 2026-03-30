@@ -1,28 +1,67 @@
-;;;; stage2.lisp — Stage 2: enter 32-bit protected mode, write to VGA, halt
+;;;; stage2.lisp — Stage 2: 32-bit PM → 64-bit long mode, print status, halt
 ;;;;
-;;;; Atomic goal: confirm protected mode works by writing directly to the
-;;;; VGA text buffer at 0xB8000. No BIOS, no long mode, no page tables.
-;;;;
-;;;; If QEMU shows "Protected mode OK" in white text, this step is done.
+;;;; Steps:
+;;;;   1. Extend GDT with a 64-bit code segment (L=1)
+;;;;   2. Write identity-mapped page tables into 0x1000–0x3FFF (16MB)
+;;;;   3. Enable PAE, load CR3, set EFER.LME, enable paging
+;;;;   4. Far jump to 64-bit code segment
+;;;;   5. Print [  OK  ] status lines via vga-print.lisp helpers
 
 (in-package #:ecclesia)
 
-(defparameter *pm-message* "Protected mode OK")
+(defun page-table-forms ()
+  "Write identity-mapped page tables in 32-bit PM.
+   Maps first 16MB as 8 × 2MB huge pages — covers VGA at 0xB8000.
+   PML4 @ 0x1000, PDPT @ 0x2000, PD @ 0x3000"
+  `(;; Zero 3 pages (0x1000–0x3FFF)
+    (mov  edi #x1000)
+    (xor  eax eax)
+    (mov  ecx #x0c00)
+    (rep  stosd)
 
-(defun vga-clear-forms ()
-  "Return assembly forms to clear the VGA text screen (80×25, grey on black)."
-  '((mov  edi #xb8000)
-    (mov  eax #x07200720)   ; two cells: space + grey attr
-    (mov  ecx #x03e8)       ; 1000 dwords = 2000 cells
-    (rep  stosd)))
+    ;; PML4[0] → PDPT at 0x2000
+    (mov  (mem32 #x1000) #x2003)
 
-(defun pm-vga-forms (str)
-  "Write STR to VGA at row 0 col 0 (0xB8000), white on black (attr 0x0F).
-   Uses (mem32 addr) form — valid in 32-bit PM with flat addressing."
-  (loop for ch across str
-        for i from 0
-        for addr = (+ #xb8000 (* 2 i))
-        collect `(mov (mem32 ,addr) ,(logior (char-code ch) #x0f00))))
+    ;; PDPT[0] → PD at 0x3000
+    (mov  (mem32 #x2000) #x3003)
+
+    ;; PD entries 0-7: identity-map 8 × 2MB = 16MB (covers 0xB8000)
+    (mov  (mem32 #x3000) #x000083)
+    (mov  (mem32 #x3008) #x200083)
+    (mov  (mem32 #x3010) #x400083)
+    (mov  (mem32 #x3018) #x600083)
+    (mov  (mem32 #x3020) #x800083)
+    (mov  (mem32 #x3028) #xa00083)
+    (mov  (mem32 #x3030) #xc00083)
+    (mov  (mem32 #x3038) #xe00083)))
+
+(defun long-mode-entry-forms ()
+  "Enable PAE, load CR3, set EFER.LME, enable paging, then far jump to 64-bit."
+  `(;; Enable PAE (CR4 bit 5)
+    (mov  eax cr4)
+    (or   eax #x20)
+    (mov  cr4 eax)
+
+    ;; Load PML4 into CR3
+    (mov  eax #x1000)
+    (mov  cr3 eax)
+
+    ;; Set EFER.LME (MSR 0xC0000080 bit 8)
+    (mov  ecx #xc0000080)
+    (rdmsr)
+    (or   eax #x100)
+    (wrmsr)
+
+    ;; Enable paging: CR0.PG (bit 31) — activates long mode
+    (mov  eax cr0)
+    (or   eax #x80000000)
+    (mov  cr0 eax)
+
+    ;; Row 3: confirm paging enabled (before far jump, still in 32-bit PM)
+    ,@(pm-vga-status-forms "PAE + EFER.LME + paging enabled" :row 3)
+
+    ;; Far jump to 64-bit code segment (selector 0x18 = GDT entry 3)
+    (jmp  far #x0018 lm-entry)))
 
 (defparameter *stage2*
   `(;; ===== 16-bit real mode =====
@@ -30,29 +69,24 @@
     (org  #x8000)
 
     (cli)
-
-    ;; Load GDT
     (lgdt (gdt-ptr))
 
-    ;; Set CR0.PE
+    ;; Enable protected mode
     (mov  eax cr0)
     (or   eax #x01)
     (mov  cr0 eax)
 
-    ;; Far jump to flush pipeline and enter 32-bit PM
-    ;; Selector 0x08 = GDT entry 1 (32-bit code)
+    ;; Far jump to 32-bit PM (selector 0x08)
     (jmp  far #x0008 pm-entry)
 
     ;; ── GDT ──────────────────────────────────────────────────────────────
     (label gdt-start)
-    (dq #x0000000000000000)       ; null
-    ;; 32-bit code: base=0, limit=4GB, G=1, D=1(32-bit), P=1, DPL=0, type=0xA
-    (dq #x00cf9a000000ffff)
-    ;; 32-bit data: base=0, limit=4GB, G=1, D=1, P=1, DPL=0, type=0x2
-    (dq #x00cf92000000ffff)
+    (dq #x0000000000000000)       ; 0x00: null
+    (dq #x00cf9a000000ffff)       ; 0x08: 32-bit code (D=1)
+    (dq #x00cf92000000ffff)       ; 0x10: 32-bit data
+    (dq #x00af9a000000ffff)       ; 0x18: 64-bit code (L=1)
     (label gdt-end)
 
-    ;; GDT pointer: limit (2 bytes) + base (4 bytes)
     (label gdt-ptr)
     (dw (- gdt-end gdt-start 1))
     (dd gdt-start)
@@ -61,7 +95,6 @@
     (bits 32)
     (label pm-entry)
 
-    ;; Load data segment selectors (0x10 = GDT entry 2)
     (mov  ax #x0010)
     (mov  ds ax)
     (mov  es ax)
@@ -73,10 +106,35 @@
     ;; Clear screen
     ,@(vga-clear-forms)
 
-    ;; Write "Protected mode OK" to VGA text buffer
-    ,@(pm-vga-forms *pm-message*)
+    ;; Row 0: header
+    ,@(pm-vga-forms "Ecclesia OS" :row 0 :col 0 :attr #x0e)
 
-    ;; Done
+    ;; Row 1: protected mode confirmed
+    ,@(pm-vga-status-forms "Entered 32-bit protected mode" :row 1)
+
+    ;; Row 2: page tables
+    ,@(page-table-forms)
+    ,@(pm-vga-status-forms "Identity-mapped page tables (16MB)" :row 2)
+
+    ;; Enter long mode (prints row 3, then far jumps)
+    ,@(long-mode-entry-forms)
+
+    ;; ===== 64-bit long mode =====
+    (bits 64)
+    (label lm-entry)
+
+    ;; Load VGA base into RDI for all 64-bit VGA writes
+    (mov  rdi #xb8000)
+
+    (mov  ax #x0010)
+    (mov  ds ax)
+    (mov  es ax)
+    (mov  ss ax)
+
+    ;; Row 4: long mode confirmed
+    ,@(lm-vga-status-forms "Entered 64-bit long mode" :row 4)
+
+    ;; Halt
     (hlt)))
 
 (defun stage2-size ()

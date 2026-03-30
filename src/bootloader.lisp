@@ -92,7 +92,7 @@
       (label load-stage2)
       ;; Load Stage 2 (sectors 2-5) into 0x8000
       (mov  ah #x02)       ; INT 13h: read sectors
-      (mov  al #x04)       ; read 4 sectors = Stage 2
+      (mov  al #x08)       ; read 8 sectors = Stage 2 (up to 4KB)
       (mov  ch #x00)       ; cylinder 0
       (mov  cl #x02)       ; sector 2
       (mov  dh #x00)       ; head 0
@@ -112,7 +112,7 @@
       (mov  ah #x02)
       (mov  al #x08)       ; 8 sectors = 4KB kernel
       (mov  ch #x00)
-      (mov  cl #x06)       ; sector 6
+      (mov  cl #x0a)       ; sector 10 (after 8 sectors of Stage 2)
       (mov  dh #x00)
       (mov  dl #x00)
       (mov  bx #x0000)     ; ES:BX = 0x2000:0x0000 = physical 0x20000

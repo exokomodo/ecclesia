@@ -96,6 +96,9 @@
     (or   eax #x80000000)
     (mov  cr0 eax)
 
+    ;; Row 3: confirm paging enabled (before far jump, still in 32-bit PM)
+    ,@(pm-vga-status-forms "PAE + EFER.LME + paging enabled" :row 3)
+
     ;; Far jump to 64-bit code segment (selector 0x18 = GDT entry 3)
     (jmp  far #x0018 lm-entry)))
 
@@ -157,8 +160,7 @@
     ;; Enter long mode
     ,@(long-mode-entry-forms)
 
-    ;; Row 3: paging + long mode activation
-    ,@(pm-vga-status-forms "PAE + EFER.LME + paging enabled" :row 3)
+
 
     ;; ===== 64-bit long mode =====
     (bits 64)

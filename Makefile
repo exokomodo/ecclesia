@@ -10,10 +10,10 @@ UNAME_S := $(shell uname -s)
 # Variables
 QEMU      ?= qemu-system-x86_64
 FLOPPY    ?= floppy.img
-WRITER    ?= write-kernel
+WRITER    ?= scripts/write-kernel.lisp
 
 # Source files
-SOURCES   := $(wildcard src/*.lisp src/*.asd src/*.asm) $(WRITER)
+SOURCES   := ecclesia.asd $(wildcard src/*.lisp src/*.asm) $(WRITER)
 
 ##@ Environment Setup
 

@@ -1,0 +1,12 @@
+{
+    "[commonlisp]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "qingpeng.common-lisp"
+    },
+    "cSpell.words": [
+        "defpackage",
+        "defsystem",
+        "defun",
+        "dolist"
+    ]
+}

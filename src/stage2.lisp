@@ -113,11 +113,20 @@
     ;; Clear screen
     ,@(vga-clear-forms)
 
+    ;; Checkpoint A: PM entry confirmed (cyan 'A' at col 0)
+    (mov (mem32 #xb8000) #x0b41)
+
     ;; Build page tables
     ,@(page-table-forms)
 
+    ;; Checkpoint B: page tables written (cyan 'B' at col 1)
+    (mov (mem32 #xb8002) #x0b42)
+
     ;; Enter long mode
     ,@(long-mode-entry-forms)
+
+    ;; Checkpoint C: after CR0.PG set (cyan 'C' at col 2) — only if we don't fault
+    (mov (mem32 #xb8004) #x0b43)
 
     ;; ===== 64-bit long mode =====
     (bits 64)

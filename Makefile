@@ -8,48 +8,58 @@ MAKEFLAGS += --no-print-directory
 UNAME_S := $(shell uname -s)
 
 # Variables
-QEMU := qemu-system-x86_64
-BUILD_DIR := build
-SRC_DIR := src
-KERNEL_BIN := $(BUILD_DIR)/kernel.bin
+QEMU      := qemu-system-x86_64
+FLOPPY    := floppy.img
 
 ##@ Environment Setup
 
 .PHONY: setup
-setup: setup/sbcl ## Install all development dependencies
+setup: setup/sbcl setup/qemu ## Install all development dependencies
 
 .PHONY: setup/sbcl
-setup/sbcl: ## Install SBCL, NASM, QEMU and Common Lisp dependencies
+setup/sbcl: ## Install SBCL
 ifeq ($(UNAME_S),Linux)
-	sudo apt update && sudo apt install -y sbcl nasm qemu-system-x86
+	sudo apt update && sudo apt install -y sbcl
 else ifeq ($(UNAME_S),Darwin)
-	brew install sbcl nasm qemu
+	brew install sbcl
 else
-	$(error "Unsupported OS: $(UNAME_S). Please install SBCL, NASM, and QEMU manually.")
+	$(error "Unsupported OS: $(UNAME_S). Please install SBCL manually.")
+endif
+
+.PHONY: setup/qemu
+setup/qemu: ## Install QEMU
+ifeq ($(UNAME_S),Linux)
+	sudo apt update && sudo apt install -y qemu-system-x86
+else ifeq ($(UNAME_S),Darwin)
+	brew install qemu
+else
+	$(error "Unsupported OS: $(UNAME_S). Please install QEMU manually.")
 endif
 
 ##@ Development Tasks
 
-.PHONY: boot
-boot: build ## Build and launch in QEMU
-	@echo "[+] Launching in QEMU..."
-	$(QEMU) -kernel $(KERNEL_BIN) -serial stdio -display none
-
 .PHONY: build
-build: ## Build the kernel image (SBCL runtime + boot stub)
-	@echo "[+] Assembling boot stub..."
-	mkdir -p $(BUILD_DIR)
-	nasm -f elf64 $(SRC_DIR)/boot.asm -o $(BUILD_DIR)/boot.o
-	@echo "[+] Building SBCL bare-metal image..."
-	sbcl --noinform \
-	     --no-userinit \
-	     --no-sysinit \
-	     --load $(SRC_DIR)/boot.lisp \
-	     --save-lisp-and-die $(KERNEL_BIN) \
-	     --executable
+build: ## Assemble kernel image via SBCL
+	@echo "[+] Building floppy image..."
+	./write-kernel
+
+.PHONY: boot
+boot: build ## Build and boot in QEMU
+	@echo "[+] Launching in QEMU..."
+	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio
+
+.PHONY: debug
+debug: build ## Build and boot in QEMU with GDB support
+	@echo "[+] Launching in QEMU (GDB on :1234)..."
+	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio -s -S
 
 ##@ Utilities
 
+.PHONY: clean
+clean: ## Remove build artifacts
+	@echo "[+] Cleaning..."
+	rm -f $(FLOPPY)
+
 .PHONY: help
 help: ## Show available targets
-	awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\n"} /^[a-zA-Z_0-9/-]+:.*?##/ { printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) }' $(MAKEFILE_LIST)

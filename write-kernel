@@ -1,0 +1,9 @@
+#!/usr/bin/env -S sbcl --script
+;;;; write-kernel — SBCL build script
+;;;; Loads the Ecclesia ASDF system and emits floppy.img
+
+(require 'asdf)
+(pushnew (truename "src/") asdf:*central-registry* :test #'equal)
+(asdf:oos 'asdf:load-op 'ecclesia)
+(in-package #:ecclesia)
+(write-kernel "floppy.img")

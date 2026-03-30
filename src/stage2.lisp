@@ -78,8 +78,9 @@
     (mov  eax cr0)
     (or   eax #x80000000)
     (mov  cr0 eax)
-    ;; NOTE: no VGA write here — 0xB8000 is outside our 2MB identity map
-    ;; and would cause a page fault before the IDT is set up.
+
+    ;; Checkpoint 4: paging enabled (0xB8000 now mapped in 16MB range)
+    (mov  (mem32 #xb800c) #x0b34)
 
     ;; Far jump to 64-bit code segment (selector 0x18 = GDT entry 3)
     (jmp  far #x0018 lm-entry)))

@@ -8,8 +8,12 @@ MAKEFLAGS += --no-print-directory
 UNAME_S := $(shell uname -s)
 
 # Variables
-QEMU      := qemu-system-x86_64
-FLOPPY    := floppy.img
+QEMU      ?= qemu-system-x86_64
+FLOPPY    ?= floppy.img
+WRITER    ?= write-kernel
+
+# Source files
+SOURCES   := $(wildcard src/*.lisp src/*.asd src/*.asm) $(WRITER)
 
 ##@ Environment Setup
 
@@ -38,10 +42,13 @@ endif
 
 ##@ Development Tasks
 
+$(FLOPPY): $(SOURCES)
+	echo "[+] Building floppy image..."
+	./$(WRITER)
+
 .PHONY: build
-build: ## Assemble kernel image via SBCL
-	@echo "[+] Building floppy image..."
-	./write-kernel
+build: $(FLOPPY) ## Assemble kernel image via SBCL
+	:
 
 .PHONY: boot
 boot: build ## Build and boot in QEMU

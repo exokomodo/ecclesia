@@ -6,6 +6,7 @@
   :components ((:module "src"
                 :components ((:file "package")
                              (:file "assembler")
+                             (:file "vga-print")
                              (:file "bootloader")
                              (:file "stage2")
                              (:file "kernel64")

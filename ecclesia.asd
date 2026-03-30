@@ -4,13 +4,16 @@
   :description "Ecclesia: a Common Lisp microkernel OS."
   :serial t
   :components ((:module "src"
-                :components ((:file "package")
-                             (:file "assembler")
-                             (:file "vga-print")
-                             (:file "bootloader")
-                             (:file "stage2")
-                             (:file "kernel64")
-                             (:file "kernel")))))
+                :components
+                ((:file "package")
+                 (:file "assembler")
+                 (:module "utils"
+                  :components ((:file "vga-print")))
+                 (:module "boot"
+                  :components ((:file "bootloader")
+                               (:file "stage2")
+                               (:file "kernel64")))
+                 (:file "kernel")))))
 
 (defsystem ecclesia/test
   :description "Ecclesia unit tests."

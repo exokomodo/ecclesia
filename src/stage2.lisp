@@ -58,7 +58,7 @@
     (mov  cr0 eax)
 
     ;; Row 3: confirm paging enabled (before far jump, still in 32-bit PM)
-    ,@(pm-vga-status-forms "PAE + EFER.LME + paging enabled" :row 3)
+    ,@(vga-status "PAE + EFER.LME + paging enabled" :row 3)
 
     ;; Far jump to 64-bit code segment (selector 0x18 = GDT entry 3)
     (jmp  far #x0018 lm-entry)))
@@ -107,14 +107,14 @@
     ,@(vga-clear-forms)
 
     ;; Row 0: header
-    ,@(pm-vga-forms "Ecclesia OS" :row 0 :col 0 :attr #x0e)
+    ,@(vga-write "Ecclesia OS" :row 0 :col 0 :attr #x0e)
 
     ;; Row 1: protected mode confirmed
-    ,@(pm-vga-status-forms "Entered 32-bit protected mode" :row 1)
+    ,@(vga-status "Entered 32-bit protected mode" :row 1)
 
     ;; Row 2: page tables
     ,@(page-table-forms)
-    ,@(pm-vga-status-forms "Identity-mapped page tables (16MB)" :row 2)
+    ,@(vga-status "Identity-mapped page tables (16MB)" :row 2)
 
     ;; Enter long mode (prints row 3, then far jumps)
     ,@(long-mode-entry-forms)
@@ -132,7 +132,7 @@
     (mov  ss ax)
 
     ;; Row 4: long mode confirmed
-    ,@(lm-vga-status-forms "Entered 64-bit long mode" :row 4)
+    ,@(vga-rdi-status "Entered 64-bit long mode" :row 4)
 
     ;; Halt
     (hlt)))

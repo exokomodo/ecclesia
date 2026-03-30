@@ -17,10 +17,10 @@
            #:vga-offset
            #:vga-cell
            #:vga-clear-forms
-           #:pm-vga-forms
-           #:pm-vga-status-forms
-           #:lm-vga-forms
-           #:lm-vga-status-forms
+           #:vga-write
+           #:vga-status
+           #:vga-rdi-write
+           #:vga-rdi-status
            #:*stage2*
            #:stage2-size
            #:*kernel64*

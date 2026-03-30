@@ -140,9 +140,11 @@
       (mov-rdi-word 9)
       (jmp
        (cond
-         ((eq (first args) 'far)   5)  ; 0xea offset16 seg16  (real/pm)
-         ((eq (first args) 'abs)   3)  ; 0xe9 rel16
-         ((eq (first args) 'short) 2)  ; 0xeb rel8
+         ;; FAR: 16-bit mode → 0xEA off16 seg16 = 5 bytes
+         ;;      32-bit mode → 0xEA off32 seg16 = 7 bytes
+         ((eq (first args) 'far)   (if (= *asm-bits* 16) 5 7))
+         ((eq (first args) 'abs)   3)
+         ((eq (first args) 'short) 2)
          (t (error "Unknown JMP form"))))
       (t (error "Unknown instruction (size): ~a" op)))))
 
@@ -382,14 +384,18 @@
         ;; JMP
         (jmp
          (cond
-           ;; (jmp far <seg16> <label>) — real mode far jump: 0xEA off16 seg16
+           ;; (jmp far <seg16> <label>)
+           ;; 16-bit mode: 0xEA off16 seg16  (5 bytes)
+           ;; 32-bit mode: 0xEA off32 seg16  (7 bytes)
            ((eq (first args) 'far)
             (let* ((seg    (second args))
                    (label  (third args))
                    (offset (resolve label)))
               (push-byte #xea)
-              (push-u16 (logand offset #xffff))
-              (push-u16 (logand seg    #xffff))))
+              (if (= *asm-bits* 16)
+                  (push-u16 (logand offset #xffff))
+                  (push-u32 (logand offset #xffffffff)))
+              (push-u16 (logand seg #xffff))))
            ;; (jmp abs <addr16/32>) — near relative: 0xE9 rel16
            ((eq (first args) 'abs)
             (let* ((target (second args))

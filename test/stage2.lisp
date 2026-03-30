@@ -24,11 +24,19 @@
     (assert= t (<= (length img) +stage2-size+)
              "Stage 2 fits within 4 sectors (2048 bytes)")
 
-    ;; Stage 2 starts with MOV SI, imm16 (0xBE)
-    (assert= #xbe (aref img 0)
-             "Stage 2 first byte is MOV SI (0xBE)")
+    ;; Stage 2 starts with CLI (0xFA)
+    (assert= #xfa (aref img 0)
+             "Stage 2 first byte is CLI (0xFA)")
 
-    ;; HLT (0xF4) should appear — Stage 2 halts after printing
+    ;; LGDT (0x0F 0x01) should appear
+    (let ((lgdt-pos (loop for i from 0 below (- (length img) 1)
+                          when (and (= (aref img i) #x0f)
+                                    (= (aref img (1+ i)) #x01))
+                          return i)))
+      (assert= t (not (null lgdt-pos))
+               "Stage 2 contains LGDT (0x0F 0x01)"))
+
+    ;; HLT (0xF4) present
     (let ((hlt-pos (loop for i from 0 below (length img)
                          when (= (aref img i) #xf4) return i)))
       (assert= t (not (null hlt-pos))

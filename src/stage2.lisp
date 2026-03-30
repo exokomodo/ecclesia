@@ -51,21 +51,25 @@
     (mov  eax cr4)
     (or   eax #x20)
     (mov  cr4 eax)
+    (mov  (mem32 #xb8006) #x0b31)   ; checkpoint '1' = PAE done
 
     ;; Load PML4 into CR3
     (mov  eax #x1000)
     (mov  cr3 eax)
+    (mov  (mem32 #xb8008) #x0b32)   ; checkpoint '2' = CR3 done
 
     ;; Set EFER.LME (MSR 0xC0000080 bit 8)
     (mov  ecx #xc0000080)
     (rdmsr)
     (or   eax #x100)
     (wrmsr)
+    (mov  (mem32 #xb800a) #x0b33)   ; checkpoint '3' = EFER done
 
     ;; Enable paging: CR0.PG (bit 31) — activates long mode
     (mov  eax cr0)
     (or   eax #x80000000)
     (mov  cr0 eax)
+    (mov  (mem32 #xb800c) #x0b34)   ; checkpoint '4' = paging done
 
     ;; Far jump to 64-bit code segment (selector 0x18 = GDT entry 3)
     (jmp  far #x0018 lm-entry)))

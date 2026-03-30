@@ -17,7 +17,7 @@
 
 (defconstant +floppy-sector-size+  512)
 (defconstant +floppy-total-size+   (* 2880 512))  ; standard 1.44MB floppy
-(defconstant +stage2-sectors+      4)
+(defconstant +stage2-sectors+      8)  ; up to 4KB for Stage 2
 (defconstant +stage2-size+         (* +stage2-sectors+ +floppy-sector-size+))
 
 (defun pad-to-sector (bytes)

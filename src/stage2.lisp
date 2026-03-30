@@ -60,27 +60,21 @@
     (mov  eax cr4)
     (or   eax #x20)
     (mov  cr4 eax)
-    (mov  (mem32 #xb8006) #x0b31)   ; checkpoint '1' = PAE done
 
     ;; Load PML4 into CR3
     (mov  eax #x1000)
     (mov  cr3 eax)
-    (mov  (mem32 #xb8008) #x0b32)   ; checkpoint '2' = CR3 done
 
     ;; Set EFER.LME (MSR 0xC0000080 bit 8)
     (mov  ecx #xc0000080)
     (rdmsr)
     (or   eax #x100)
     (wrmsr)
-    (mov  (mem32 #xb800a) #x0b33)   ; checkpoint '3' = EFER done
 
     ;; Enable paging: CR0.PG (bit 31) — activates long mode
     (mov  eax cr0)
     (or   eax #x80000000)
     (mov  cr0 eax)
-
-    ;; Checkpoint 4: paging enabled (0xB8000 now mapped in 16MB range)
-    (mov  (mem32 #xb800c) #x0b34)
 
     ;; Far jump to 64-bit code segment (selector 0x18 = GDT entry 3)
     (jmp  far #x0018 lm-entry)))
@@ -125,46 +119,45 @@
     (mov  ss ax)
     (mov  esp #x90000)
 
-    ;; Clear screen
+    ;; Clear screen first
     ,@(vga-clear-forms)
 
-    ;; Checkpoint A: PM entry confirmed (cyan 'A' at col 0)
-    (mov (mem32 #xb8000) #x0b41)
+    ;; Row 0: "Ecclesia booting..." header
+    ,@(pm-vga-forms "Ecclesia" :row 0 :col 0 :attr #x0e)  ; yellow
+
+    ;; Row 1: "32-bit protected mode OK"
+    ,@(pm-vga-forms "32-bit protected mode OK" :row 1 :col 0 :attr #x0f)
 
     ;; Build page tables
     ,@(page-table-forms)
 
-    ;; Checkpoint B: page tables written (cyan 'B' at col 1)
-    (mov (mem32 #xb8002) #x0b42)
+    ;; Row 2: "Page tables OK"
+    ,@(pm-vga-forms "Page tables OK" :row 2 :col 0 :attr #x0f)
 
     ;; Enter long mode
     ,@(long-mode-entry-forms)
 
-    ;; Checkpoint C: after CR0.PG set (cyan 'C' at col 2) — only if we don't fault
-    (mov (mem32 #xb8004) #x0b43)
+    ;; Row 3: "Paging enabled" (written from 32-bit PM after CR0.PG)
+    ,@(pm-vga-forms "Paging enabled" :row 3 :col 0 :attr #x0f)
 
     ;; ===== 64-bit long mode =====
     (bits 64)
     (label lm-entry)
 
-    ;; Load VGA base so mov-rdi-word works correctly
+    ;; Load VGA base into RDI
     (mov  rdi #xb8000)
-
-    ;; Checkpoint E: landed in lm-entry
-    (mov-rdi-word 14 #x0b45)      ; 'E' at VGA col 7
 
     (mov  ax #x0010)
     (mov  ds ax)
     (mov  es ax)
     (mov  ss ax)
 
-    ;; Checkpoint F: past segment setup
-    (mov-rdi-word 16 #x0b46)      ; 'F' at VGA col 8
-
-    ;; Write "Long mode OK" to VGA using RDI-relative writes (safe in 64-bit)
-    ,@(loop for ch across *lm-message*
-            for i from 0
-            collect `(mov-rdi-word ,(* 2 i) ,(logior (char-code ch) #x0a00)))
+    ;; Row 4: "Long mode OK" in bright green
+    ,@(let ((row 4))
+        (loop for ch across *lm-message*
+              for i from 0
+              collect `(mov-rdi-word ,(+ (* row 80 2) (* 2 i))
+                                     ,(logior (char-code ch) #x0a00))))
 
     ;; Halt
     (hlt)))

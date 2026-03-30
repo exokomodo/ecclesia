@@ -11,8 +11,9 @@
                   :components ((:file "vga-print")))
                  (:module "boot"
                   :components ((:file "bootloader")
-                               (:file "stage2")
-                               (:file "kernel64")))))))
+                               (:file "stage2")))
+                 (:module "kernel"
+                  :components ((:file "kernel64")))))))
 
 (defsystem ecclesia/test
   :description "Ecclesia unit tests."

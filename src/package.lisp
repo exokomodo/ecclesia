@@ -2,8 +2,7 @@
 
 (defpackage #:ecclesia
   (:use #:cl)
-  (:export #:write-kernel
-           #:assemble
+  (:export #:assemble
            #:collect-labels
            #:emit-instruction
            #:eval-expr

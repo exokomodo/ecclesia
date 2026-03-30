@@ -1,0 +1,34 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install SBCL
+        run: |
+          make setup/sbcl
+
+      - name: Build
+        run: |
+          make build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: floppy-image
+          path: floppy.img
+
+
+      - name: Unit Tests
+        run: |
+          make test/unit

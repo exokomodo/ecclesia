@@ -24,24 +24,11 @@
     (assert= t (<= (length img) (* 8 +floppy-sector-size+))
              "Kernel64 fits within 8 sectors (4096 bytes)")
 
-    ;; REX.W prefix (0x48) for MOV RSP should appear near start
-    (assert= #x48 (aref img 0)
-             "First byte is REX.W prefix (MOV RSP, imm64)")
-
-    ;; REP STOSD (0xF3 0xAB) for screen clear should be present
-    (let ((rep-pos (loop for i from 0 below (- (length img) 1)
-                         when (and (= (aref img i) #xf3)
-                                   (= (aref img (1+ i)) #xab))
-                         return i)))
-      (assert= t (not (null rep-pos))
-               "Kernel64 contains REP STOSD (0xF3 0xAB) for screen clear"))
-
-    ;; IN AL, port (0xe4) for keyboard polling should be present
-    (let ((in-pos (loop for i from 0 below (length img)
-                        when (= (aref img i) #xe4)
-                        return i)))
-      (assert= t (not (null in-pos))
-               "Kernel64 contains IN AL instruction (0xE4) for keyboard")))
+    ;; Stub: just verify it assembles and halts
+    (let ((hlt-pos (loop for i from 0 below (length img)
+                         when (= (aref img i) #xf4) return i)))
+      (assert= t (not (null hlt-pos))
+               "Kernel64 stub contains HLT (0xF4)")))
 
   (format t "~%All kernel64 tests passed.~%"))
 

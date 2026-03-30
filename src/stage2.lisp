@@ -28,22 +28,31 @@
         collect `(mov (mem32 ,addr) ,(logior (char-code ch) (ash attr 8)))))
 
 (defun page-table-forms ()
-  "Write minimal identity-mapped page tables in 32-bit PM.
-   PML4 @ 0x1000, PDPT @ 0x2000, PD @ 0x3000 (2MB huge page)."
-  `(;; Zero 3 pages (0x1000–0x3FFF = 12288 bytes = 3072 dwords)
+  "Write identity-mapped page tables in 32-bit PM.
+   Maps first 16MB as 8 × 2MB huge pages — covers VGA at 0xB8000.
+   PML4 @ 0x1000, PDPT @ 0x2000, PD @ 0x3000"
+  `(;; Zero 3 pages (0x1000–0x3FFF)
     (mov  edi #x1000)
     (xor  eax eax)
     (mov  ecx #x0c00)
     (rep  stosd)
 
-    ;; PML4[0] → PDPT at 0x2000 (present + writable)
+    ;; PML4[0] → PDPT at 0x2000
     (mov  (mem32 #x1000) #x2003)
 
-    ;; PDPT[0] → PD at 0x3000 (present + writable)
+    ;; PDPT[0] → PD at 0x3000
     (mov  (mem32 #x2000) #x3003)
 
-    ;; PD[0] → 2MB huge page at 0x000000 (PS=0x80 + present + writable)
-    (mov  (mem32 #x3000) #x0083)))
+    ;; PD entries 0-7: identity-map 8 × 2MB = 16MB (covers 0xB8000)
+    ;; Each entry: (n * 0x200000) | 0x83  (PS + present + writable)
+    (mov  (mem32 #x3000) #x000083)   ; 0MB
+    (mov  (mem32 #x3008) #x200083)   ; 2MB
+    (mov  (mem32 #x3010) #x400083)   ; 4MB
+    (mov  (mem32 #x3018) #x600083)   ; 6MB
+    (mov  (mem32 #x3020) #x800083)   ; 8MB
+    (mov  (mem32 #x3028) #xa00083)   ; 10MB
+    (mov  (mem32 #x3030) #xc00083)   ; 12MB — covers 0xB8000
+    (mov  (mem32 #x3038) #xe00083))) ; 14MB
 
 (defun long-mode-entry-forms ()
   "Enable PAE, load CR3, set EFER.LME, enable paging."
@@ -69,7 +78,8 @@
     (mov  eax cr0)
     (or   eax #x80000000)
     (mov  cr0 eax)
-    (mov  (mem32 #xb800c) #x0b34)   ; checkpoint '4' = paging done
+    ;; NOTE: no VGA write here — 0xB8000 is outside our 2MB identity map
+    ;; and would cause a page fault before the IDT is set up.
 
     ;; Far jump to 64-bit code segment (selector 0x18 = GDT entry 3)
     (jmp  far #x0018 lm-entry)))

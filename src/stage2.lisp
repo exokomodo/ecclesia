@@ -63,6 +63,13 @@
     (mov  ss ax)
     (mov  esp #x90000)
 
+    ;; Clear screen: 80×25 cells, space + grey attr (0x0720)
+    ;; 2000 cells × 2 bytes = 4000 bytes = 1000 dwords
+    (mov  edi #xb8000)
+    (mov  eax #x07200720)
+    (mov  ecx #x03e8)
+    (rep  stosd)
+
     ;; Write "Protected mode OK" to VGA text buffer
     ,@(pm-vga-forms *pm-message*)
 

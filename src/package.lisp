@@ -2,4 +2,9 @@
 
 (defpackage #:ecclesia
   (:use #:cl)
-  (:export #:write-kernel))
+  (:export #:write-kernel
+           #:assemble
+           #:*bootloader*
+           #:+code-size+
+           #:banner-db-forms
+           #:*banner*))

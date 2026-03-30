@@ -8,3 +8,10 @@
                              (:file "assembler")
                              (:file "bootloader")
                              (:file "kernel")))))
+
+(defsystem ecclesia/test
+  :description "Ecclesia unit tests."
+  :depends-on (ecclesia)
+  :serial t
+  :components ((:module "test"
+                :components ((:file "unit")))))

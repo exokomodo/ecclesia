@@ -65,7 +65,7 @@ test: test/unit ## Run tests
 
 .PHONY: test/unit
 test/unit: ## Run unit tests
-	:
+	./scripts/run-tests.lisp
 
 ##@ Utilities
 

@@ -17,3 +17,6 @@
 *.wx32fsl
 
 build/
+
+*.img
+write-kernel

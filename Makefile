@@ -55,6 +55,11 @@ boot: build ## Build and boot in QEMU
 	@echo "[+] Launching in QEMU..."
 	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio
 
+.PHONY: boot-once
+boot-once: build ## Boot in QEMU, halt instead of reboot on triple fault
+	@echo "[+] Launching in QEMU (no-reboot)..."
+	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio -no-reboot -no-shutdown
+
 .PHONY: debug
 debug: build ## Build and boot in QEMU with GDB support
 	@echo "[+] Launching in QEMU (GDB on :1234)..."

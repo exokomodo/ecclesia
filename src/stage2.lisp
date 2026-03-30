@@ -136,10 +136,19 @@
     (bits 64)
     (label lm-entry)
 
-    (mov  ax #x0010)              ; data selector (0x66 prefix auto-added)
+    ;; Load VGA base so mov-rdi-word works correctly
+    (mov  rdi #xb8000)
+
+    ;; Checkpoint E: landed in lm-entry
+    (mov-rdi-word 14 #x0b45)      ; 'E' at VGA col 7
+
+    (mov  ax #x0010)
     (mov  ds ax)
     (mov  es ax)
     (mov  ss ax)
+
+    ;; Checkpoint F: past segment setup
+    (mov-rdi-word 16 #x0b46)      ; 'F' at VGA col 8
 
     ;; Write "Long mode OK" to VGA
     ,@(pm-vga-forms *lm-message* :row 0 :col 0 :attr #x0a)  ; bright green

@@ -1,199 +1,343 @@
-;;;; assembler.lisp — x86-16 two-pass assembler (MBR-capable)
+;;;; assembler.lisp — x86 two-pass assembler (16/32/64-bit, MBR + Stage 2)
 ;;;;
-;;;; Pass 1: walk instructions, record label addresses (using estimated sizes).
+;;;; Pass 1: walk instructions, record label addresses.
 ;;;; Pass 2: emit bytes with labels resolved.
 ;;;;
 ;;;; Supported forms:
-;;;;   (org  <addr>)           — set origin
-;;;;   (bits 16)               — accepted, no-op
-;;;;   (db   <byte> ...)       — emit raw byte(s)
-;;;;   (dw   <word>)           — emit 16-bit little-endian word
-;;;;   (times <n> db <byte>)   — emit N copies of byte
-;;;;   (label <name>)          — define label at current position
-;;;;   (cli) (sti) (hlt)       — single-byte instructions
-;;;;   (xor  <r16> <r16>)      — XOR reg, reg
-;;;;   (mov  <dst> <src>)      — MOV (sreg←r16, r16←imm16, r16←r16)
-;;;;   (int  <imm8>)           — INT imm8
-;;;;   (jmp  short <label>)    — short relative jump (rel8)
+;;;;   (org  <addr>)              — set origin
+;;;; Mode control:
+;;;;   (bits 16|32|64)            — set current addressing mode
+;;;; Data:
+;;;;   (db   <byte> ...)          — emit raw byte(s)
+;;;;   (dw   <word>)              — emit 16-bit LE word
+;;;;   (dd   <dword>)             — emit 32-bit LE dword
+;;;;   (dq   <qword>)             — emit 64-bit LE qword
+;;;;   (times <n> db <byte>)      — emit N copies of byte
+;;;;   (label <name>)             — define label at current position
+;;;; 16-bit instructions:
+;;;;   (cli) (sti) (hlt)
+;;;;   (xor  <r16> <r16>)
+;;;;   (mov  <dst> <src>)         — sreg←r16, r16←imm16, r16←r16, r8←imm8
+;;;;   (int  <imm8>)
+;;;;   (lodsb) (lodsw)
+;;;;   (test al al)
+;;;;   (jmp  short <label>)       — rel8
+;;;;   (jmp  abs   <addr>)        — near rel16/32
+;;;;   (jmp  far   <sel> <label>) — far jump (segment:offset)
+;;;;   (jz/jnz/jc/jnc <label>)   — conditional short jumps
+;;;; 32-bit instructions:
+;;;;   (mov  eax cr0|cr4)         — read control register
+;;;;   (mov  cr0|cr4 eax)         — write control register
+;;;;   (mov  <r32> <imm32>)       — MOV r32, imm32
+;;;;   (mov  <sreg> <r16imm>)     — MOV sreg, ax (16-bit)
+;;;;   (or   <r32> <imm32>)       — OR r32, imm32
+;;;;   (mov  esp <imm32>)         — stack pointer
+;;;;   (lgdt (<label>))           — load GDT
+;;;;   (rdmsr) (wrmsr)            — MSR access
+;;;;   (mov  ecx <imm32>)         — MOV ECX, imm32
 
 (in-package #:ecclesia)
 
-;;; ── Register encoding ──────────────────────────────────────────────────────
-
-(defparameter *r16-encoding*
-  '((ax . 0) (cx . 1) (dx . 2) (bx . 3)
-    (sp . 4) (bp . 5) (si . 6) (di . 7)))
+;;; ── Register tables ─────────────────────────────────────────────────────────
 
 (defparameter *r8-encoding*
   '((al . 0) (cl . 1) (dl . 2) (bl . 3)
     (ah . 4) (ch . 5) (dh . 6) (bh . 7)))
 
+(defparameter *r16-encoding*
+  '((ax . 0) (cx . 1) (dx . 2) (bx . 3)
+    (sp . 4) (bp . 5) (si . 6) (di . 7)))
+
+(defparameter *r32-encoding*
+  '((eax . 0) (ecx . 1) (edx . 2) (ebx . 3)
+    (esp . 4) (ebp . 5) (esi . 6) (edi . 7)))
+
 (defparameter *sreg-encoding*
   '((es . 0) (cs . 1) (ss . 2) (ds . 3) (fs . 4) (gs . 5)))
 
-(defun r16-enc (reg)
-  (or (cdr (assoc reg *r16-encoding*))
-      (error "Unknown r16 register: ~a" reg)))
+(defparameter *creg-encoding*
+  '((cr0 . 0) (cr2 . 2) (cr3 . 3) (cr4 . 4)))
 
-(defun sreg-enc (reg)
-  (cdr (assoc reg *sreg-encoding*)))
+(defun r8-enc  (r) (or (cdr (assoc r *r8-encoding*))  (error "Unknown r8:  ~a" r)))
+(defun r16-enc (r) (or (cdr (assoc r *r16-encoding*)) (error "Unknown r16: ~a" r)))
+(defun r32-enc (r) (or (cdr (assoc r *r32-encoding*)) (error "Unknown r32: ~a" r)))
+(defun sreg-enc (r) (cdr (assoc r *sreg-encoding*)))
+(defun creg-enc (r) (cdr (assoc r *creg-encoding*)))
 
-(defun sreg-p (sym) (not (null (assoc sym *sreg-encoding*))))
-(defun r16-p  (sym) (not (null (assoc sym *r16-encoding*))))
-(defun r8-p   (sym) (not (null (assoc sym *r8-encoding*))))
-(defun r8-enc (reg) (or (cdr (assoc reg *r8-encoding*))
-                        (error "Unknown r8 register: ~a" reg)))
+(defun r8-p   (s) (not (null (assoc s *r8-encoding*))))
+(defun r16-p  (s) (not (null (assoc s *r16-encoding*))))
+(defun r32-p  (s) (not (null (assoc s *r32-encoding*))))
+(defun sreg-p (s) (not (null (assoc s *sreg-encoding*))))
+(defun creg-p (s) (not (null (assoc s *creg-encoding*))))
 
-;;; ── Instruction size estimation (pass 1) ──────────────────────────────────
+;;; ── Instruction size estimation (pass 1) ────────────────────────────────────
 
 (defun instruction-size (form)
-  "Return the byte size of FORM without emitting anything."
   (destructuring-bind (op &rest args) form
     (case op
       ((bits org label) 0)
       (db    (length args))
       (dw    2)
-      (times (destructuring-bind (n db-op byte) args
-               (declare (ignore db-op byte))
-               n))
-      ((cli sti hlt lodsb lodsw)  1)
-      ((test jz jnz)  2)
-      (xor   2)                       ; 0x31 ModRM
+      (dd    4)
+      (dq    8)
+      (times (destructuring-bind (n db-op byte) args (declare (ignore db-op byte)) n))
+      ((cli sti hlt lodsb lodsw rdmsr wrmsr) 1)
+      (int   2)
+      ((test jz jnz jc jnc) 2)
+      (xor   2)
       (mov
        (let ((dst (first args)) (src (second args)))
-         (cond ((sreg-p dst) 2)       ; 0x8e ModRM
-               ((and (r8-p dst) (numberp src)) 2)  ; 0xb0+r imm8
-               ((numberp src) 3)      ; 0xb8+r imm16
-               ((r16-p src)   2)      ; 0x89 ModRM
-               (t (error "Unknown MOV: ~a ~a" dst src)))))
-      (int   2)
-      (jmp   2)                       ; 0xeb rel8
+         (cond
+           ;; MOV r8, imm8
+           ((and (r8-p dst) (numberp src)) 2)
+           ;; MOV sreg, r16
+           ((sreg-p dst) 2)
+           ;; MOV r16, imm16
+           ((and (r16-p dst) (numberp src)) 3)
+           ;; MOV r16, r16
+           ((and (r16-p dst) (r16-p src)) 2)
+           ;; MOV r32, cr  or  MOV cr, r32  (0x0f 0x20/0x22 ModRM)
+           ((or (and (r32-p dst) (creg-p src))
+                (and (creg-p dst) (r32-p src))) 3)
+           ;; MOV r32, imm32
+           ((and (r32-p dst) (numberp src)) 5)
+           ;; MOV r32, r32
+           ((and (r32-p dst) (r32-p src)) 2)
+           (t (error "Unknown MOV size: ~a ~a" dst src)))))
+      (or
+       (let ((dst (first args)) (src (second args)))
+         (cond
+           ;; OR r32, imm32
+           ((and (r32-p dst) (numberp src)) 6)
+           ;; OR r32, r32
+           ((and (r32-p dst) (r32-p src)) 2)
+           (t (error "Unknown OR size: ~a ~a" dst src)))))
+      (lgdt  4)   ; 0x0f 0x01 /2  ModRM + 16-bit offset (disp16)
+      (jmp
+       (cond
+         ((eq (first args) 'far)   5)  ; 0xea offset16 seg16  (real/pm)
+         ((eq (first args) 'abs)   3)  ; 0xe9 rel16
+         ((eq (first args) 'short) 2)  ; 0xeb rel8
+         (t (error "Unknown JMP form"))))
       (t (error "Unknown instruction (size): ~a" op)))))
 
-;;; ── Pass 1: collect label addresses ───────────────────────────────────────
+;;; ── Pass 1: collect label addresses ─────────────────────────────────────────
 
 (defun collect-labels (instructions origin)
-  "Walk INSTRUCTIONS and return a hash-table mapping label names → addresses."
   (let ((labels (make-hash-table))
         (offset 0))
     (dolist (form instructions)
       (destructuring-bind (op &rest args) form
         (case op
-          (org (setf offset (- (first args) origin)))
+          (org   (setf offset (- (first args) origin)))
           (label (setf (gethash (first args) labels) (+ origin offset)))
-          (t (incf offset (instruction-size form))))))
+          (t     (incf offset (instruction-size form))))))
     labels))
 
-;;; ── Pass 2: emit bytes ─────────────────────────────────────────────────────
+;;; ── Expression evaluator ─────────────────────────────────────────────────────
+
+(defun eval-expr (expr labels)
+  "Evaluate EXPR: integer → itself; symbol → label lookup;
+   list (op a b) → apply op recursively."
+  (cond
+    ((integerp expr) expr)
+    ((symbolp expr)
+     (or (gethash expr labels)
+         (error "Undefined label in expression: ~a" expr)))
+    ((listp expr)
+     (let ((op  (first expr))
+           (a   (eval-expr (second expr) labels))
+           (b   (when (third expr) (eval-expr (third expr) labels))))
+       (case op
+         (+ (+ a b))
+         (- (if b (- a b) (- a)))
+         (* (* a b))
+         (t (error "Unknown expression operator: ~a" op)))))
+    (t (error "Cannot evaluate expression: ~a" expr))))
+
+;;; ── Pass 2: emit bytes ───────────────────────────────────────────────────────
 
 (defun emit-instruction (form labels origin buf)
-  "Emit bytes for FORM into BUF (adjustable vector with fill-pointer).
-   LABELS is the hash-table from pass 1. ORIGIN is the load address."
   (flet ((cur-addr () (+ origin (fill-pointer buf)))
          (push-byte (b) (vector-push-extend (logand b #xff) buf))
          (push-u16 (w)
            (vector-push-extend (logand w #xff) buf)
-           (vector-push-extend (logand (ash w -8) #xff) buf)))
+           (vector-push-extend (logand (ash w -8) #xff) buf))
+         (push-u32 (d)
+           (loop for i from 0 to 24 by 8
+                 do (vector-push-extend (logand (ash d (- i)) #xff) buf)))
+         (push-u64 (q)
+           (loop for i from 0 to 56 by 8
+                 do (vector-push-extend (logand (ash q (- i)) #xff) buf)))
+         (resolve (name)
+           (or (gethash name labels)
+               (error "Undefined label: ~a" name))))
     (destructuring-bind (op &rest args) form
       (case op
         ((bits org label) nil)
 
-        (db    (dolist (b args) (push-byte b)))
-        (dw    (push-u16 (first args)))
+        (db    (dolist (b args) (push-byte (eval-expr b labels))))
+        (dw    (push-u16 (eval-expr (first args) labels)))
+        (dd    (push-u32 (eval-expr (first args) labels)))
+        (dq    (push-u64 (eval-expr (first args) labels)))
 
         (times (destructuring-bind (n db-op byte) args
                  (declare (ignore db-op))
                  (dotimes (_ n) (push-byte byte))))
 
-        (cli   (push-byte #xfa))
-        (sti   (push-byte #xfb))
-        (hlt   (push-byte #xf4))
+        (cli    (push-byte #xfa))
+        (sti    (push-byte #xfb))
+        (hlt    (push-byte #xf4))
+        (lodsb  (push-byte #xac))
+        (lodsw  (push-byte #xad))
+        (rdmsr  (push-byte #x0f) (push-byte #x32))
+        (wrmsr  (push-byte #x0f) (push-byte #x30))
 
+        ;; XOR r16, r16  →  0x31 /r
         (xor
          (let ((dst (r16-enc (first args)))
                (src (r16-enc (second args))))
            (push-byte #x31)
            (push-byte (logior #xc0 (ash src 3) dst))))
 
-        (mov
-         (let ((dst (first args)) (src (second args)))
-           (cond
-             ((sreg-p dst)
-              (push-byte #x8e)
-              (push-byte (logior #xc0 (ash (sreg-enc dst) 3) (r16-enc src))))
-             ;; MOV r8, imm8  →  0xb0+r imm8
-           ((and (r8-p dst) (numberp src))
-            (push-byte (+ #xb0 (r8-enc dst)))
-            (push-byte (logand src #xff)))
-           ;; MOV r16, imm16  →  0xb8+r imm16
-           ((numberp src)
-            (push-byte (+ #xb8 (r16-enc dst)))
-            (push-u16 src))
-             ((r16-p src)
-              (push-byte #x89)
-              (push-byte (logior #xc0 (ash (r16-enc src) 3) (r16-enc dst))))
-             (t (error "Unsupported MOV: ~a ~a" dst src)))))
-
-        ;; LODSB — load byte at DS:SI into AL, increment SI
-        (lodsb (push-byte #xac))
-
-        ;; LODSW — load word at DS:SI into AX, increment SI by 2
-        (lodsw (push-byte #xad))
-
-        ;; TEST AL, AL  (or TEST r8, r8 — we support only AL,AL for now)
+        ;; TEST AL, AL  →  0x84 0xC0
         (test
          (when (and (eq (first args) 'al) (eq (second args) 'al))
            (push-byte #x84) (push-byte #xc0)))
 
-        ;; JZ / JE  short label  →  0x74 rel8
+        ;; MOV — many variants
+        (mov
+         (let ((dst (first args)) (src (second args)))
+           (cond
+             ;; MOV r8, imm8  →  0xb0+r imm8
+             ((and (r8-p dst) (numberp src))
+              (push-byte (+ #xb0 (r8-enc dst)))
+              (push-byte (logand src #xff)))
+             ;; MOV sreg, r16  →  0x8e /r
+             ((sreg-p dst)
+              (push-byte #x8e)
+              (push-byte (logior #xc0 (ash (sreg-enc dst) 3) (r16-enc src))))
+             ;; MOV r16, imm16  →  0xb8+r imm16
+             ((and (r16-p dst) (numberp src))
+              (push-byte (+ #xb8 (r16-enc dst)))
+              (push-u16 src))
+             ;; MOV r16, r16  →  0x89 /r
+             ((and (r16-p dst) (r16-p src))
+              (push-byte #x89)
+              (push-byte (logior #xc0 (ash (r16-enc src) 3) (r16-enc dst))))
+             ;; MOV r32, cr  →  0x0f 0x20 /r
+             ((and (r32-p dst) (creg-p src))
+              (push-byte #x0f) (push-byte #x20)
+              (push-byte (logior #xc0 (ash (creg-enc src) 3) (r32-enc dst))))
+             ;; MOV cr, r32  →  0x0f 0x22 /r
+             ((and (creg-p dst) (r32-p src))
+              (push-byte #x0f) (push-byte #x22)
+              (push-byte (logior #xc0 (ash (creg-enc dst) 3) (r32-enc src))))
+             ;; MOV r32, imm32  →  0xb8+r imm32
+             ((and (r32-p dst) (numberp src))
+              (push-byte (+ #xb8 (r32-enc dst)))
+              (push-u32 src))
+             ;; MOV r32, r32  →  0x89 /r
+             ((and (r32-p dst) (r32-p src))
+              (push-byte #x89)
+              (push-byte (logior #xc0 (ash (r32-enc src) 3) (r32-enc dst))))
+             (t (error "Unsupported MOV: ~a ~a" dst src)))))
+
+        ;; OR r32, imm32  →  0x81 /1 imm32
+        (or
+         (let ((dst (first args)) (src (second args)))
+           (cond
+             ((and (r32-p dst) (numberp src))
+              (push-byte #x81)
+              (push-byte (logior #xc8 (r32-enc dst)))  ; /1 = 0b001xxxxx
+              (push-u32 src))
+             ((and (r32-p dst) (r32-p src))
+              (push-byte #x09)
+              (push-byte (logior #xc0 (ash (r32-enc src) 3) (r32-enc dst))))
+             (t (error "Unsupported OR: ~a ~a" dst src)))))
+
+        ;; LGDT [label]  →  0x0f 0x01 /2  ModRM(mod=00,reg=2,r/m=6) + disp16
+        ;; (lgdt (<label>))
+        (lgdt
+         (let* ((label-name (caar args))
+                (addr       (resolve label-name))
+                (offset16   (logand addr #xffff)))
+           (push-byte #x0f) (push-byte #x01)
+           (push-byte #x16)   ; ModRM: mod=00 reg=010(/2) r/m=110 → [disp16]
+           (push-u16 offset16)))
+
+        ;; MOV ECX, imm32 (handled above in MOV)
+
+        ;; Conditional short jumps
         (jz
-         (let* ((target (or (gethash (first args) labels)
-                            (error "Undefined label: ~a" (first args))))
-                (here   (+ (cur-addr) 2))
-                (rel    (- target here)))
-           (unless (<= -128 rel 127)
-             (error "JZ out of range to ~a (rel=~d)" (first args) rel))
+         (let* ((tgt (resolve (first args)))
+                (rel (- tgt (+ (cur-addr) 2))))
+           (unless (<= -128 rel 127) (error "JZ out of range"))
            (push-byte #x74) (push-byte (logand rel #xff))))
 
-        ;; JNZ / JNE  short label  →  0x75 rel8
         (jnz
-         (let* ((target (or (gethash (first args) labels)
-                            (error "Undefined label: ~a" (first args))))
-                (here   (+ (cur-addr) 2))
-                (rel    (- target here)))
-           (unless (<= -128 rel 127)
-             (error "JNZ out of range to ~a (rel=~d)" (first args) rel))
+         (let* ((tgt (resolve (first args)))
+                (rel (- tgt (+ (cur-addr) 2))))
+           (unless (<= -128 rel 127) (error "JNZ out of range"))
            (push-byte #x75) (push-byte (logand rel #xff))))
 
+        (jc
+         (let* ((tgt (resolve (first args)))
+                (rel (- tgt (+ (cur-addr) 2))))
+           (unless (<= -128 rel 127) (error "JC out of range"))
+           (push-byte #x72) (push-byte (logand rel #xff))))
+
+        (jnc
+         (let* ((tgt (resolve (first args)))
+                (rel (- tgt (+ (cur-addr) 2))))
+           (unless (<= -128 rel 127) (error "JNC out of range"))
+           (push-byte #x73) (push-byte (logand rel #xff))))
+
+        ;; INT imm8
         (int
          (push-byte #xcd)
          (push-byte (logand (first args) #xff)))
 
+        ;; JMP
         (jmp
-         ;; (jmp short <label>)
-         (when (eq (first args) 'short)
-           (let* ((target (or (gethash (second args) labels)
-                              (error "Undefined label: ~a" (second args))))
-                  (here   (+ (cur-addr) 2))
-                  (rel    (- target here)))
-             (unless (<= -128 rel 127)
-               (error "Short jump out of range to ~a (rel=~d)" (second args) rel))
-             (push-byte #xeb)
-             (push-byte (logand rel #xff)))))
+         (cond
+           ;; (jmp far <seg16> <label>) — real mode far jump: 0xEA off16 seg16
+           ((eq (first args) 'far)
+            (let* ((seg    (second args))
+                   (label  (third args))
+                   (offset (resolve label)))
+              (push-byte #xea)
+              (push-u16 (logand offset #xffff))
+              (push-u16 (logand seg    #xffff))))
+           ;; (jmp abs <addr16/32>) — near relative: 0xE9 rel16
+           ((eq (first args) 'abs)
+            (let* ((target (second args))
+                   (here   (+ (cur-addr) 3))
+                   (rel    (- target here)))
+              (push-byte #xe9)
+              (push-u16 (logand rel #xffff))))
+           ;; (jmp short <label>) — short relative: 0xEB rel8
+           ((eq (first args) 'short)
+            (let* ((tgt (resolve (second args)))
+                   (rel (- tgt (+ (cur-addr) 2))))
+              (unless (<= -128 rel 127)
+                (error "Short jump out of range to ~a (rel=~d)" (second args) rel))
+              (push-byte #xeb)
+              (push-byte (logand rel #xff))))
+           (t (error "Unsupported JMP form: ~a" args))))
 
         (t (error "Unknown instruction: ~a" op))))))
 
-;;; ── Public API ─────────────────────────────────────────────────────────────
+;;; ── Public API ───────────────────────────────────────────────────────────────
 
 (defun assemble (instructions)
   "Two-pass assemble INSTRUCTIONS into a (unsigned-byte 8) vector."
-  ;; Determine origin from first (org ...) form, default 0
   (let ((origin (or (loop for form in instructions
                           when (eq (car form) 'org)
                           return (cadr form))
                     0)))
     (let ((labels (collect-labels instructions origin))
-          (buf    (make-array 512
+          (buf    (make-array 4096
                               :element-type '(unsigned-byte 8)
                               :fill-pointer 0
                               :adjustable t)))

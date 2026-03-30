@@ -7,6 +7,7 @@
                 :components ((:file "package")
                              (:file "assembler")
                              (:file "bootloader")
+                             (:file "stage2")
                              (:file "kernel")))))
 
 (defsystem ecclesia/test
@@ -14,4 +15,5 @@
   :depends-on (ecclesia)
   :serial t
   :components ((:module "test"
-                :components ((:file "bootloader")))))
+                :components ((:file "bootloader")
+                             (:file "stage2")))))

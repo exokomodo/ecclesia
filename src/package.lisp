@@ -11,6 +11,7 @@
            #:+code-size+
            #:boot-message-db-forms
            #:*boot-message*
+           #:vga-clear-forms
            #:*stage2*
            #:stage2-size
            #:*kernel64*

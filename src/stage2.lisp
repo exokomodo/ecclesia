@@ -9,6 +9,13 @@
 
 (defparameter *pm-message* "Protected mode OK")
 
+(defun vga-clear-forms ()
+  "Return assembly forms to clear the VGA text screen (80×25, grey on black)."
+  '((mov  edi #xb8000)
+    (mov  eax #x07200720)   ; two cells: space + grey attr
+    (mov  ecx #x03e8)       ; 1000 dwords = 2000 cells
+    (rep  stosd)))
+
 (defun pm-vga-forms (str)
   "Write STR to VGA at row 0 col 0 (0xB8000), white on black (attr 0x0F).
    Uses (mem32 addr) form — valid in 32-bit PM with flat addressing."
@@ -63,12 +70,8 @@
     (mov  ss ax)
     (mov  esp #x90000)
 
-    ;; Clear screen: 80×25 cells, space + grey attr (0x0720)
-    ;; 2000 cells × 2 bytes = 4000 bytes = 1000 dwords
-    (mov  edi #xb8000)
-    (mov  eax #x07200720)
-    (mov  ecx #x03e8)
-    (rep  stosd)
+    ;; Clear screen
+    ,@(vga-clear-forms)
 
     ;; Write "Protected mode OK" to VGA text buffer
     ,@(pm-vga-forms *pm-message*)

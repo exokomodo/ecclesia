@@ -14,4 +14,4 @@
   :depends-on (ecclesia)
   :serial t
   :components ((:module "test"
-                :components ((:file "unit")))))
+                :components ((:file "bootloader")))))

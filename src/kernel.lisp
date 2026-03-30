@@ -15,9 +15,10 @@
 
 (in-package #:ecclesia)
 
-(defconstant +floppy-sector-size+ 512)
-(defconstant +stage2-sectors+     4)
-(defconstant +stage2-size+        (* +stage2-sectors+ +floppy-sector-size+))
+(defconstant +floppy-sector-size+  512)
+(defconstant +floppy-total-size+   (* 2880 512))  ; standard 1.44MB floppy
+(defconstant +stage2-sectors+      4)
+(defconstant +stage2-size+         (* +stage2-sectors+ +floppy-sector-size+))
 
 (defun pad-to-sector (bytes)
   "Return a new byte vector padded to the next sector boundary."
@@ -45,22 +46,28 @@
 
       (format t "[ecclesia] Assembling 64-bit kernel...~%")
       (let ((kernel (pad-to-sector (assemble *kernel64*))))
-        (let ((total (+ +floppy-sector-size+ +stage2-size+ (length kernel))))
-          (format t "[ecclesia] Writing floppy image (~d bytes)...~%~%" total)
+        (let* ((content-size (+ +floppy-sector-size+ +stage2-size+ (length kernel)))
+               (total        +floppy-total-size+))
+          (format t "[ecclesia] Writing floppy image (~d bytes / 1.44MB)...~%~%" total)
 
           (with-open-file (out output-path
                                :direction :output
                                :element-type '(unsigned-byte 8)
                                :if-exists :supersede)
+            ;; Sector 1: Stage 1 MBR
             (write-sequence stage1 out)
+            ;; Sectors 2-5: Stage 2
             (write-sequence stage2 out)
-            ;; Pad stage2 to exactly +stage2-size+ if needed
             (loop repeat (- +stage2-size+ (length stage2))
                   do (write-byte 0 out))
-            (write-sequence kernel out))
+            ;; Sectors 6+: kernel
+            (write-sequence kernel out)
+            ;; Pad to full 1.44MB so INT 13h CHS geometry is valid
+            (loop repeat (- total content-size)
+                  do (write-byte 0 out)))
 
           (format t "[ecclesia] Done.~%")
           (format t "  Stage 1: ~d bytes~%" (length stage1))
           (format t "  Stage 2: ~d bytes~%" (length stage2))
           (format t "  Kernel:  ~d bytes~%" (length kernel))
-          (format t "  Total:   ~d bytes~%" total))))))
+          (format t "  Total:   ~d bytes (1.44MB floppy)~%" total))))))

@@ -133,7 +133,7 @@
            ;; OR r32, r32
            ((and (r32-p dst) (r32-p src)) 2)
            (t (error "Unknown OR size: ~a ~a" dst src)))))
-      (lgdt  4)
+      (lgdt  5)   ; 0x0f 0x01 ModRM disp16
       ;; IN AL, imm8  →  2 bytes
       (in    2)
       ;; MOV WORD PTR [RDI+disp32], imm16  →  0x66 0xC7 0x87 disp32 imm16 = 9 bytes

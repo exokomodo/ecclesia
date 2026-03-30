@@ -1,56 +1,83 @@
-;;;; stage2.lisp — Stage 2 (minimal: 16-bit real mode, print message, halt)
+;;;; stage2.lisp — Stage 2: enter 32-bit protected mode, write to VGA, halt
 ;;;;
-;;;; Goal: confirm Stage 1 → Stage 2 handoff works before adding
-;;;; protected mode, long mode, or page tables.
+;;;; Atomic goal: confirm protected mode works by writing directly to the
+;;;; VGA text buffer at 0xB8000. No BIOS, no long mode, no page tables.
+;;;;
+;;;; If QEMU shows "Protected mode OK" in white text, this step is done.
 
 (in-package #:ecclesia)
 
-(defparameter *stage2-message*
-  (concatenate 'string
-    (string #\Return) (string #\Newline)
-    "Stage 2 OK"
-    (string #\Return) (string #\Newline)))
+(defparameter *pm-message* "Protected mode OK")
 
-(defun stage2-message-db-forms ()
-  (append (loop for c across *stage2-message* collect `(db ,(char-code c)))
-          '((db 0))))
+(defun vga-clear-forms ()
+  "Return assembly forms to clear the VGA text screen (80×25, grey on black)."
+  '((mov  edi #xb8000)
+    (mov  eax #x07200720)   ; two cells: space + grey attr
+    (mov  ecx #x03e8)       ; 1000 dwords = 2000 cells
+    (rep  stosd)))
 
-(defconstant +s2-code-size+ 17)  ; see layout below
+(defun pm-vga-forms (str)
+  "Write STR to VGA at row 0 col 0 (0xB8000), white on black (attr 0x0F).
+   Uses (mem32 addr) form — valid in 32-bit PM with flat addressing."
+  (loop for ch across str
+        for i from 0
+        for addr = (+ #xb8000 (* 2 i))
+        collect `(mov (mem32 ,addr) ,(logior (char-code ch) #x0f00))))
 
-(defun make-stage2 ()
-  (let* ((msg-forms (stage2-message-db-forms))
-         (msg-size  (length msg-forms))
-         (msg-addr  (+ #x8000 +s2-code-size+)))
-    ;;  MOV SI, imm16  = 3
-    ;;  MOV AH, #x0e  = 2
-    ;;  MOV BH, #x00  = 2
-    ;;  LODSB          = 1
-    ;;  TEST AL, AL    = 2
-    ;;  JZ done        = 2
-    ;;  INT #x10       = 2
-    ;;  JNZ print-loop = 2
-    ;;  HLT            = 1
-    ;; Total           = 17
-    `((bits 16)
-      (org  #x8000)
+(defparameter *stage2*
+  `(;; ===== 16-bit real mode =====
+    (bits 16)
+    (org  #x8000)
 
-      (mov  si ,msg-addr)
-      (mov  ah #x0e)
-      (mov  bh #x00)
+    (cli)
 
-      (label print-loop)
-      (lodsb)
-      (test al al)
-      (jz   done)
-      (int  #x10)
-      (jnz  print-loop)
+    ;; Load GDT
+    (lgdt (gdt-ptr))
 
-      (label done)
-      (hlt)
+    ;; Set CR0.PE
+    (mov  eax cr0)
+    (or   eax #x01)
+    (mov  cr0 eax)
 
-      ,@msg-forms)))
+    ;; Far jump to flush pipeline and enter 32-bit PM
+    ;; Selector 0x08 = GDT entry 1 (32-bit code)
+    (jmp  far #x0008 pm-entry)
 
-(defparameter *stage2* (make-stage2))
+    ;; ── GDT ──────────────────────────────────────────────────────────────
+    (label gdt-start)
+    (dq #x0000000000000000)       ; null
+    ;; 32-bit code: base=0, limit=4GB, G=1, D=1(32-bit), P=1, DPL=0, type=0xA
+    (dq #x00cf9a000000ffff)
+    ;; 32-bit data: base=0, limit=4GB, G=1, D=1, P=1, DPL=0, type=0x2
+    (dq #x00cf92000000ffff)
+    (label gdt-end)
+
+    ;; GDT pointer: limit (2 bytes) + base (4 bytes)
+    (label gdt-ptr)
+    (dw (- gdt-end gdt-start 1))
+    (dd gdt-start)
+
+    ;; ===== 32-bit protected mode =====
+    (bits 32)
+    (label pm-entry)
+
+    ;; Load data segment selectors (0x10 = GDT entry 2)
+    (mov  ax #x0010)
+    (mov  ds ax)
+    (mov  es ax)
+    (mov  fs ax)
+    (mov  gs ax)
+    (mov  ss ax)
+    (mov  esp #x90000)
+
+    ;; Clear screen
+    ,@(vga-clear-forms)
+
+    ;; Write "Protected mode OK" to VGA text buffer
+    ,@(pm-vga-forms *pm-message*)
+
+    ;; Done
+    (hlt)))
 
 (defun stage2-size ()
   (length (assemble *stage2*)))

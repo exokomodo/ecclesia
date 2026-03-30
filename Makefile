@@ -60,6 +60,13 @@ debug: build ## Build and boot in QEMU with GDB support
 	@echo "[+] Launching in QEMU (GDB on :1234)..."
 	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio -s -S
 
+.PHONY: test
+test: test/unit ## Run tests
+
+.PHONY: test/unit
+test/unit: ## Run unit tests
+	:
+
 ##@ Utilities
 
 .PHONY: clean

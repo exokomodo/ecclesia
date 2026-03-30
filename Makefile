@@ -19,28 +19,34 @@ KERNEL_BIN := $(BUILD_DIR)/kernel.bin
 setup: setup/sbcl ## Install all development dependencies
 
 .PHONY: setup/sbcl
-setup/sbcl: ## Install SBCL and Common Lisp dependencies
+setup/sbcl: ## Install SBCL, NASM, QEMU and Common Lisp dependencies
 ifeq ($(UNAME_S),Linux)
-	sudo apt update && sudo apt install -y sbcl cl-ppcre
+	sudo apt update && sudo apt install -y sbcl nasm qemu-system-x86
 else ifeq ($(UNAME_S),Darwin)
-	brew install sbcl
-	echo "On macOS, install cl-ppcre via Quicklisp: (ql:quickload :cl-ppcre)"
+	brew install sbcl nasm qemu
 else
-	$(error "Unsupported OS: $(UNAME_S). Please install SBCL manually.")
+	$(error "Unsupported OS: $(UNAME_S). Please install SBCL, NASM, and QEMU manually.")
 endif
 
 ##@ Development Tasks
 
 .PHONY: boot
-boot: build
+boot: build ## Build and launch in QEMU
 	@echo "[+] Launching in QEMU..."
-	$(QEMU) -kernel $(KERNEL_BIN)
+	$(QEMU) -kernel $(KERNEL_BIN) -serial stdio -display none
 
 .PHONY: build
-build:
-	@echo "[+] Building kernel..."
+build: ## Build the kernel image (SBCL runtime + boot stub)
+	@echo "[+] Assembling boot stub..."
 	mkdir -p $(BUILD_DIR)
-	gcc -ffreestanding -nostdlib -o $(KERNEL_BIN) $(SRC_DIR)/kernel.c
+	nasm -f elf64 $(SRC_DIR)/boot.asm -o $(BUILD_DIR)/boot.o
+	@echo "[+] Building SBCL bare-metal image..."
+	sbcl --noinform \
+	     --no-userinit \
+	     --no-sysinit \
+	     --load $(SRC_DIR)/boot.lisp \
+	     --save-lisp-and-die $(KERNEL_BIN) \
+	     --executable
 
 ##@ Utilities
 

@@ -13,6 +13,7 @@
            #:*boot-message*
            #:*stage2*
            #:stage2-size
+           #:*kernel64*
            #:+floppy-sector-size+
            #:+stage2-sectors+
            #:+stage2-size+))

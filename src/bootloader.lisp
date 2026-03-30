@@ -55,7 +55,7 @@
 ;;; Let's use a near JMP to absolute 0x8000 from known position.
 ;;; Total code before msg = let's compute
 
-(defconstant +code-size+ 58)
+(defconstant +code-size+ 82)
 
 (defun make-bootloader ()
   (let* ((msg-forms  (boot-message-db-forms))
@@ -90,13 +90,32 @@
 
       ;; Load Stage 2 from floppy into 0x8000
       (label load-stage2)
+      ;; Load Stage 2 (sectors 2-5) into 0x8000
       (mov  ah #x02)       ; INT 13h: read sectors
-      (mov  al #x04)       ; read 4 sectors (2KB)
+      (mov  al #x04)       ; read 4 sectors = Stage 2
       (mov  ch #x00)       ; cylinder 0
-      (mov  cl #x02)       ; sector 2 (1-indexed; sector 1 = MBR)
+      (mov  cl #x02)       ; sector 2
       (mov  dh #x00)       ; head 0
       (mov  dl #x00)       ; drive 0 (floppy)
-      (mov  bx #x8000)     ; destination offset (ES=0x0000 set above)
+      (mov  bx #x8000)     ; destination: 0x0000:0x8000
+      (int  #x13)
+      (jc   disk-error)
+
+      ;; Load kernel (sectors 6-13, 8 sectors = 4KB) into 0x1000:0x0000 = 0x10000
+      ;; We can't load to 0x100000 from real mode without A20+unreal mode tricks.
+      ;; Use segment trick: ES=0x1000, BX=0x0000 → physical 0x10000
+      ;; Then Stage 2 copies from 0x10000 to 0x100000 in PM.
+      ;; Actually, simpler: use unreal mode to access >1MB, OR just load at
+      ;; a low address and copy. For now load at 0x20000 (ES=0x2000, BX=0).
+      (mov  ax #x2000)
+      (mov  es ax)
+      (mov  ah #x02)
+      (mov  al #x08)       ; 8 sectors = 4KB kernel
+      (mov  ch #x00)
+      (mov  cl #x06)       ; sector 6
+      (mov  dh #x00)
+      (mov  dl #x00)
+      (mov  bx #x0000)     ; ES:BX = 0x2000:0x0000 = physical 0x20000
       (int  #x13)
       (jc   disk-error)    ; carry set = read failed
 

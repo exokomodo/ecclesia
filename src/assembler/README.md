@@ -7,7 +7,7 @@ without touching the core.
 
 ## Architecture
 
-```
+```plaintext
 src/assembler/
   assembler.lisp   — generic two-pass core
   x86-64.lisp      — x86-64 instruction encodings
@@ -27,11 +27,11 @@ The core provides:
 
 Reserved forms handled directly by the core (not in the instruction table):
 
-| Form | Meaning |
-|------|---------|
-| `(bits N)` | Set current bit mode to N (16, 32, or 64) |
-| `(org ADDR)` | Set the load origin address |
-| `(label NAME)` | Define a label at the current address |
+| Form           | Meaning                                   |
+| -------------- | ----------------------------------------- |
+| `(bits N)`     | Set current bit mode to N (16, 32, or 64) |
+| `(org ADDR)`   | Set the load origin address               |
+| `(label NAME)` | Define a label at the current address     |
 
 ### x86-64.lisp — instruction encodings
 
@@ -47,7 +47,7 @@ To add support for a new CPU (e.g. RISC-V, ARM):
 
 ### 1. Create the encoding file
 
-```
+```plaintext
 src/assembler/riscv.lisp
 ```
 

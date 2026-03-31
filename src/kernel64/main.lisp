@@ -80,7 +80,7 @@
     (mov   rbx kbd-cursor-col)
     (byte-loadsx-ecx-rbx)              ; ECX = current col
     (cmp8  cl ,(length *prompt-str*))
-    (jz    kbd-main-loop)              ; at prompt edge — ignore
+    (jbe   kbd-main-loop)              ; col <= prompt length — ignore
 
     ;; Decrement cursor col
     (dec-byte-rbx)
@@ -126,5 +126,14 @@
     ;; ── Advance cursor col ───────────────────────────────────────────────────
     (mov   rbx kbd-cursor-col)
     (inc-byte-rbx)
+    (byte-loadsx-ecx-rbx)              ; ECX = new col
+    (cmp8  cl ,+vga-cols+)             ; col >= 80?
+    (jc    kbd-no-wrap)                ; no — skip wrap
 
+    ;; Col overflow: wrap to col 0, advance row
+    (store-zero-rbx)                   ; col = 0
+    (mov   rbx kbd-cursor-row)
+    (inc-byte-rbx)
+
+    (label kbd-no-wrap)
     (jmp   abs kbd-main-loop)))

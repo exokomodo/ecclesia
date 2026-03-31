@@ -20,8 +20,7 @@
      (:module "kernel"
       :components ((:file "pipeline")
                    (:file "x86-64")))
-     (:module "kernel64"
-      :components ((:file "main")))))))
+     (:file "main")))))
 
 (defsystem ecclesia/test
   :description "Ecclesia unit tests."

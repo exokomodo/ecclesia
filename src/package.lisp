@@ -4,7 +4,7 @@
 ;;;; ecclesia.build         — build-time toolchain: assembler, boot code
 ;;;; ecclesia.kernel        — ISA-agnostic kernel pipeline generics
 ;;;; ecclesia.kernel.x86-64 — x86-64 implementations of the kernel generics
-;;;; ecclesia               — kernel image definitions (*kernel64*, etc.)
+;;;; ecclesia               — kernel image definitions (*kernel-main*, etc.)
 
 (defpackage #:ecclesia.utils
   (:use #:cl)
@@ -97,4 +97,4 @@
         #:ecclesia.kernel.x86-64)
   (:export
    ;; Kernel entry point
-   #:*kernel64*))
+   #:*kernel-main*))

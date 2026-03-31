@@ -28,7 +28,7 @@
 ;;; ── Kernel image ─────────────────────────────────────────────────────────────
 
 (let ((isa (make-instance 'ecclesia.kernel.x86-64:x86-64)))
-  (defparameter *kernel64*
+  (defparameter *kernel-main*
     `(;; ── Entry point ────────────────────────────────────────────────────────
       (bits 64)
       (org  #x100000)

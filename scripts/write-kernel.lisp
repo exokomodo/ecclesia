@@ -45,7 +45,7 @@
       (error "Stage 2 too large: ~d bytes (max ~d)" (length stage2) +stage2-size+))
 
     (format t "[ecclesia] Assembling 64-bit kernel...~%")
-    (let* ((kernel       (pad-to-sector (assemble *kernel64*)))
+    (let* ((kernel       (pad-to-sector (assemble *kernel-main*)))
            (content-size (+ +floppy-sector-size+ +stage2-size+ (length kernel)))
            (output-path  "floppy.img"))
 

@@ -61,6 +61,9 @@
     ;; Read scancode from port 0x60
     (in   al #x60)
 
+    ;; Debug: write '!' immediately on ANY byte from keyboard
+    (mov-rdi-word #x320 ,(logior (char-code #\!) #x0f00))
+
     ;; Skip key releases (bit 7 set)
     (test al #x80)
     (jnz  kbd-main-loop)
@@ -79,9 +82,6 @@
     ;; Skip unmapped (ASCII = 0)
     (test  al al)
     (jz    kbd-main-loop)
-
-    ;; Debug: write '!' white at VGA row 5 col 0 to confirm we got a keypress
-    (mov-rdi-word #x320 ,(logior (char-code #\!) #x0f00))
 
     ;; Save ASCII char in CL
     (mov   cl al)

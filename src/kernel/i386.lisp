@@ -121,7 +121,7 @@
   (make-instance 'i386))
 
 (defmethod ecclesia.kernel:isa-bits ((isa i386))          32)
-(defmethod ecclesia.kernel:isa-origin ((isa i386))        #x10000)
+(defmethod ecclesia.kernel:isa-origin ((isa i386))        #x20000)
 (defmethod ecclesia.kernel:isa-stack-pointer ((isa i386)) #x90000)
 
 (defmethod ecclesia.kernel:isa-entry-prologue-forms ((isa i386))

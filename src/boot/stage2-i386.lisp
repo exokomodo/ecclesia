@@ -64,6 +64,6 @@
 
     ;; ── Jump to i386 kernel ──────────────────────────────────────────────────
     ,@(vga-status "Jumping to kernel" :row 1 :ok t)
-    (jmp abs #x10000)))
+    (jmp abs #x20000)))
 
 (defparameter *stage2-i386* (*stage2-i386*))

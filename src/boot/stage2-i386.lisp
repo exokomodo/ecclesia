@@ -62,11 +62,14 @@
     ;; ── Clear screen ─────────────────────────────────────────────────────────
     ,@(vga-clear-forms)
 
+    ;; ── Print OS header ──────────────────────────────────────────────────────
+    ,@(vga-write "Ecclesia OS" :row 0 :col 0 :attr #x0e)
+
     ;; ── Print [  OK  ] Protected Mode ───────────────────────────────────────
-    ,@(vga-status "Protected mode" :row 0 :ok t)
+    ,@(vga-status "Protected mode" :row 1 :ok t)
 
     ;; ── Jump to i386 kernel ──────────────────────────────────────────────────
-    ,@(vga-status "Jumping to kernel" :row 1 :ok t)
+    ,@(vga-status "Jumping to kernel" :row 2 :ok t)
     (jmp abs #x20000)))
 
 (defparameter *stage2-i386* (*stage2-i386*))

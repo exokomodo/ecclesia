@@ -59,6 +59,9 @@
     (mov  ss ax)
     (mov  esp #x90000)
 
+    ;; ── Clear screen ─────────────────────────────────────────────────────────
+    ,@(vga-clear-forms)
+
     ;; ── Print [  OK  ] Protected Mode ───────────────────────────────────────
     ,@(vga-status "Protected mode" :row 0 :ok t)
 

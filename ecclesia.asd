@@ -7,13 +7,13 @@
   ((:module "src"
     :components
     ((:file "package")
+     (:module "utils"
+      :components ((:file "vga-print")))
      (:module "build"
       :components
       ((:module "assembler"
         :components ((:file "assembler")
                      (:file "x86-64")))
-       (:module "utils"
-        :components ((:file "vga-print")))
        (:module "boot"
         :components ((:file "bootloader-x86-64")
                      (:file "stage2-x86-64")))))

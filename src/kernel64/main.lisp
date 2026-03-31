@@ -74,7 +74,7 @@
 
     ;; Simplified: write character directly at row 5 col 10
     ;; Row 5 col 10: offset = (5*80+10)*2 = 820 = 0x334
-    (mov   edx #x334)
+    (mov   edx ,(vga-offset 5 10))
     (mov   rdi #xb8000)
 
     ;; Write char + attr (white on black)

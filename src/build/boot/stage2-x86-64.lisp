@@ -9,6 +9,8 @@
 
 (in-package #:ecclesia.build)
 
+
+
 ;;; Stage 2 is loaded from floppy sectors 2-9 (8 sectors = 4KB max)
 (defconstant +floppy-sector-size+ 512)
 (defconstant +stage2-sectors+     8)

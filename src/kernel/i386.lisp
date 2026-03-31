@@ -10,25 +10,10 @@
 (in-package #:ecclesia.kernel.i386)
 
 ;;; ISA designator
-(defclass i386 () ())
+(defclass i386 (ecclesia.kernel.x86-base:x86-base) ())
 
-;;; ── PS/2 polling ─────────────────────────────────────────────────────────────
-
-(defmethod ecclesia.kernel:ps2-poll-forms ((isa i386))
-  "Same PS/2 polling as x86_64 — port I/O is identical."
-  '((label kbd-poll)
-    (in   al #x64)
-    (test al #x01)
-    (jz   kbd-poll)
-    (in   al #x60)))
-
-;;; ── Scancode filtering ───────────────────────────────────────────────────────
-
-(defmethod ecclesia.kernel:scancode-filter-forms ((isa i386))
-  '((test al #x80)
-    (jnz  kbd-main-loop)
-    (cmp8 al #x59)
-    (jnc  kbd-main-loop)))
+;;; PS/2 polling, scancode filtering, dispatch, unconditional-jump, and
+;;; embedded-data-forms are inherited from ecclesia.kernel.x86-base:x86-base.
 
 ;;; ── Scancode → ASCII translation ─────────────────────────────────────────────
 
@@ -134,20 +119,6 @@
 (defmethod ecclesia.kernel:asm-prelude-forms ((isa i386))
   `((bits ,(ecclesia.kernel:isa-bits isa))
     (org  ,(ecclesia.kernel:isa-origin isa))))
-
-(defmethod ecclesia.kernel:unconditional-jump-forms ((isa i386) label)
-  `((jmp abs ,label)))
-
-(defmethod ecclesia.kernel:embedded-data-forms ((isa i386) scancode-table-forms)
-  `((label kbd-ascii-table)
-    ,@scancode-table-forms
-    (label kbd-cursor-col) (db ,(length ecclesia.kernel:*prompt-str*))
-    (label kbd-cursor-row) (db ,ecclesia.kernel:*prompt-row*)))
-
-(defmethod ecclesia.kernel:dispatch-to-handler-forms ((isa i386))
-  '((cmp8 al #x08)
-    (jz   kbd-backspace)
-    (jmp  abs kbd-printable)))
 
 (defmethod ecclesia.kernel:save-char-forms ((isa i386))
   '((push-reg eax)))

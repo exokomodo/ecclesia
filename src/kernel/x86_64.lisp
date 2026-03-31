@@ -6,28 +6,10 @@
 (in-package #:ecclesia.kernel.x86_64)
 
 ;;; ISA designator — pass (make-instance 'x86_64) to each generic.
-(defclass x86_64 () ())
+(defclass x86_64 (ecclesia.kernel.x86-base:x86-base) ())
 
-;;; ── PS/2 polling ─────────────────────────────────────────────────────────────
-
-(defmethod ecclesia.kernel:ps2-poll-forms ((isa x86_64))
-  "Spin on PS/2 status port 0x64 until output-buffer-full (bit 0) is set,
-   then read the scancode from data port 0x60 into AL."
-  '((label kbd-poll)
-    (in   al #x64)          ; read PS/2 status register
-    (test al #x01)          ; output-buffer-full?
-    (jz   kbd-poll)         ; not ready — spin
-    (in   al #x60)))        ; read scancode → AL
-
-;;; ── Scancode filtering ───────────────────────────────────────────────────────
-
-(defmethod ecclesia.kernel:scancode-filter-forms ((isa x86_64))
-  "Discard key-release scancodes (bit 7 set) and any scancode >= 0x59
-   (beyond our translation table).  Both cases branch to KBD-MAIN-LOOP."
-  '((test al #x80)          ; bit 7 = key release
-    (jnz  kbd-main-loop)
-    (cmp8 al #x59)          ; beyond translation table?
-    (jnc  kbd-main-loop)))
+;;; PS/2 polling, scancode filtering, dispatch, unconditional-jump, and
+;;; embedded-data-forms are inherited from ecclesia.kernel.x86-base:x86-base.
 
 ;;; ── Scancode → ASCII translation ─────────────────────────────────────────────
 

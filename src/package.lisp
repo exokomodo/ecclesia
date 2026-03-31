@@ -108,15 +108,23 @@
    #:asm-prelude-forms
    #:unconditional-jump-forms))
 
+(defpackage #:ecclesia.kernel.x86-base
+  (:use #:cl
+        #:ecclesia.kernel
+        #:ecclesia.utils)
+  (:export #:x86-base))
+
 (defpackage #:ecclesia.kernel.x86_64
   (:use #:cl
         #:ecclesia.kernel
+        #:ecclesia.kernel.x86-base
         #:ecclesia.utils)
   (:export #:x86_64))
 
 (defpackage #:ecclesia.kernel.i386
   (:use #:cl
         #:ecclesia.kernel
+        #:ecclesia.kernel.x86-base
         #:ecclesia.utils)
   (:export #:i386))
 
@@ -125,6 +133,7 @@
         #:ecclesia.assembler
         #:ecclesia.boot
         #:ecclesia.kernel
+        #:ecclesia.kernel.x86-base
         #:ecclesia.kernel.x86_64
         #:ecclesia.kernel.i386
         #:ecclesia.utils)

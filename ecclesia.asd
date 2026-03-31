@@ -18,6 +18,7 @@
                    (:file "stage2-i386")))
      (:module "kernel"
       :components ((:file "interface")
+                   (:file "x86_base")
                    (:file "x86_64")
                    (:file "i386")))
      (:file "main")))))

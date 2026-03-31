@@ -22,17 +22,18 @@
 
 (defun register-instruction (mnemonic size-fn emit-fn)
   "Register an instruction encoding under MNEMONIC."
-  (setf (gethash mnemonic *instruction-table*) (list size-fn emit-fn)))
+  (setf (gethash (canonicalize-mnemonic mnemonic) *instruction-table*)
+        (list size-fn emit-fn)))
 
 (defun canonicalize-symbol (sym)
-  "Intern SYM into the ecclesia.boot package.
+  "Intern SYM into the ecclesia.assembler package.
    Works for both mnemonics and register/operand symbols."
   (if (symbolp sym)
-      (intern (symbol-name sym) '#:ecclesia.boot)
+      (intern (symbol-name sym) '#:ecclesia.assembler)
       sym))
 
 (defun canonicalize-mnemonic (sym)
-  "Intern mnemonic SYM into ecclesia.boot."
+  "Intern mnemonic SYM into ecclesia.assembler."
   (canonicalize-symbol sym))
 
 (defun canonicalize-form (form)
@@ -41,6 +42,11 @@
     ((symbolp form) (canonicalize-symbol form))
     ((listp form)   (mapcar #'canonicalize-form form))
     (t form)))
+
+(defun mnemonic= (sym name)
+  "Case-insensitive mnemonic compare that ignores symbol package."
+  (and (symbolp sym)
+       (string-equal (symbol-name sym) name)))
 
 (defun lookup-instruction (mnemonic)
   (let ((canonical (canonicalize-mnemonic mnemonic)))
@@ -61,10 +67,10 @@
     ((listp expr)
      (let ((op   (first expr))
            (args (mapcar (lambda (x) (eval-expr x labels)) (rest expr))))
-       (case op
-         (+ (reduce #'+ args))
-         (- (if (cdr args) (reduce #'- args) (- (car args))))
-         (* (reduce #'* args))
+       (cond
+         ((mnemonic= op "+") (reduce #'+ args))
+         ((mnemonic= op "-") (if (cdr args) (reduce #'- args) (- (car args))))
+         ((mnemonic= op "*") (reduce #'* args))
          (t (error "Unknown expression operator: ~a" op)))))
     (t (error "Cannot evaluate: ~a" expr))))
 
@@ -78,9 +84,13 @@
 (defun instruction-size (form)
   "Return the byte size of FORM without emitting anything."
   (destructuring-bind (op &rest args) (canonicalize-form form)
-    (case op
-      ((org label) 0)
-      (bits (setf *asm-bits* (first args)) 0)
+    (cond
+      ((or (mnemonic= op "ORG")
+           (mnemonic= op "LABEL"))
+       0)
+      ((mnemonic= op "BITS")
+       (setf *asm-bits* (first args))
+       0)
       (t
        (let ((entry (lookup-instruction op)))
          (funcall (first entry) args *asm-bits*))))))
@@ -95,11 +105,15 @@
     (dolist (raw-form instructions)
       (let ((form (canonicalize-form raw-form)))
         (destructuring-bind (op &rest args) form
-          (case op
-            (org   (setf offset (- (first args) origin)))
-            (bits  (setf *asm-bits* (first args)))
-            (label (setf (gethash (first args) labels) (+ origin offset)))
-            (t     (incf offset (instruction-size form)))))))
+          (cond
+            ((mnemonic= op "ORG")
+             (setf offset (- (first args) origin)))
+            ((mnemonic= op "BITS")
+             (setf *asm-bits* (first args)))
+            ((mnemonic= op "LABEL")
+             (setf (gethash (first args) labels) (+ origin offset)))
+            (t
+             (incf offset (instruction-size form)))))))
     labels))
 
 ;;; ── Byte emission (pass 2) ──────────────────────────────────────────────────
@@ -107,9 +121,12 @@
 (defun emit-instruction (form labels origin buf)
   "Emit bytes for FORM into BUF."
   (destructuring-bind (op &rest args) (canonicalize-form form)
-    (case op
-      (bits  (setf *asm-bits* (first args)))
-      ((org label) nil)
+    (cond
+      ((mnemonic= op "BITS")
+       (setf *asm-bits* (first args)))
+      ((or (mnemonic= op "ORG")
+           (mnemonic= op "LABEL"))
+       nil)
       (t
        (let ((entry (lookup-instruction op)))
          (funcall (second entry) args labels origin buf *asm-bits*))))))
@@ -120,7 +137,7 @@
   "Two-pass assemble INSTRUCTIONS into a (unsigned-byte 8) vector."
   (let* ((origin (or (loop for form in instructions
                            for cform = (canonicalize-form form)
-                           when (eq (car cform) 'org)
+                           when (mnemonic= (car cform) "ORG")
                            return (cadr cform))
                      0))
          (labels     (collect-labels instructions origin))

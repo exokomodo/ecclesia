@@ -2,7 +2,8 @@
 
 (defpackage #:ecclesia-test-stage2
   (:use #:cl
-        #:ecclesia.assembler))
+        #:ecclesia.assembler
+        #:ecclesia.boot))
 (in-package #:ecclesia-test-stage2)
 
 (defun assert= (expected actual description)

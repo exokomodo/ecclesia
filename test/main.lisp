@@ -4,8 +4,7 @@
   (:use #:cl
         #:ecclesia
         #:ecclesia.assembler
-        ; #:ecclesia.build
-        ))
+        #:ecclesia.boot))
 (in-package #:ecclesia-test-kernel)
 
 (defun assert= (expected actual description)

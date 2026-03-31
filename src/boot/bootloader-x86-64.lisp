@@ -1,4 +1,4 @@
-;;;; bootloader.lisp — Stage 1 MBR bootloader
+;;;; bootloader-x86-64.lisp — Stage 1 MBR bootloader
 ;;;;
 ;;;; 16-bit real mode. Prints a minimal boot message, loads Stage 2
 ;;;; from floppy sector 2, and jumps to it.

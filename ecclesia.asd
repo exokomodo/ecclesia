@@ -12,8 +12,8 @@
                  (:module "utils"
                   :components ((:file "vga-print")))
                  (:module "boot"
-                  :components ((:file "bootloader")
-                               (:file "stage2")))
+                  :components ((:file "bootloader-x86-64")
+                               (:file "stage2-x86-64")))
                  (:module "kernel"
                   :components ((:file "main")))))))
 

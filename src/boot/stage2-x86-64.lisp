@@ -1,4 +1,4 @@
-;;;; stage2.lisp — Stage 2: 32-bit PM → 64-bit long mode, print status, halt
+;;;; stage2-x86-64.lisp — Stage 2: 32-bit PM → 64-bit long mode, print status, halt
 ;;;;
 ;;;; Steps:
 ;;;;   1. Extend GDT with a 64-bit code segment (L=1)

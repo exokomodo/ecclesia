@@ -78,15 +78,32 @@
     (jmp   abs kbd-printable)
 
     (label kbd-backspace)
+    ;; If off-screen (row >= 25), back up to row 24 col 79
+    (mov   rbx kbd-cursor-row)
+    (byte-loadsx-edx-rbx)
+    (mov   eax edx)
+    (cmp8  al #x19)                    ; row >= 25?
+    (jc    kbd-bs-on-screen)           ; no — normal backspace
+
+    ;; Off-screen: move cursor to row 24 col 79
+    (store-byte-rbx 24)                ; row = 24
+    (mov   rbx kbd-cursor-col)
+    (store-byte-rbx ,(1- +vga-cols+))  ; col = 79
+    (jmp   abs kbd-bs-erase)
+
+    (label kbd-bs-on-screen)
     ;; Don't erase past the prompt
     (mov   rbx kbd-cursor-col)
     (byte-loadsx-ecx-rbx)
     (cmp8  cl ,(length *prompt-str*))
     (jbe   kbd-main-loop)              ; col <= prompt length — ignore
-
-    ;; Decrement col, compute offset, write space
+    ;; Decrement col
     (dec-byte-rbx)
-    (byte-loadsx-ecx-rbx)              ; ECX = new col
+
+    (label kbd-bs-erase)
+    ;; Compute VGA offset and write space
+    (mov   rbx kbd-cursor-col)
+    (byte-loadsx-ecx-rbx)              ; ECX = col
     (mov   rbx kbd-cursor-row)
     (byte-loadsx-edx-rbx)              ; EDX = row
     (imul  edx ,(* 2 +vga-cols+))

@@ -3,7 +3,7 @@
 ;;;; Registers each supported mnemonic with the generic assembler via
 ;;;; register-instruction. Covers the subset needed for Ecclesia's boot chain.
 
-(in-package #:ecclesia.build)
+(in-package #:ecclesia.assembler)
 
 ;;; ── Register tables ─────────────────────────────────────────────────────────
 

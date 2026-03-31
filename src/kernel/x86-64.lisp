@@ -1,7 +1,7 @@
 ;;;; x86-64.lisp — x86-64 implementations of the kernel generics
 ;;;;
 ;;;; Each method specializes on the X86-64 class and returns a list of
-;;;; x86-64 assembler forms understood by ecclesia.build:assemble.
+;;;; x86-64 assembler forms understood by ecclesia.assembler:assemble.
 
 (in-package #:ecclesia.kernel.x86-64)
 

@@ -7,7 +7,7 @@
 ;;;;   4. Far jump to 64-bit code segment
 ;;;;   5. Print [  OK  ] status lines via vga.lisp helpers
 
-(in-package #:ecclesia.build)
+(in-package #:ecclesia.boot)
 
 
 

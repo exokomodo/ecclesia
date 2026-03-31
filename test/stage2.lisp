@@ -1,7 +1,9 @@
 ;;;; test/stage2.lisp — Stage 2 assembler unit tests
 
 (defpackage #:ecclesia-test-stage2
-  (:use #:cl #:ecclesia.build))
+  (:use #:cl
+        #:ecclesia.assembler
+        #:ecclesia.boot))
 (in-package #:ecclesia-test-stage2)
 
 (defun assert= (expected actual description)

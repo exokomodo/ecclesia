@@ -9,14 +9,12 @@
     ((:file "package")
      (:module "utils"
       :components ((:file "vga")))
-     (:module "build"
-      :components
-      ((:module "assembler"
-        :components ((:file "assembler")
-                     (:file "x86-64")))
-       (:module "boot"
-        :components ((:file "bootloader-x86-64")
-                     (:file "stage2-x86-64")))))
+     (:module "assembler"
+      :components ((:file "assembler")
+                   (:file "x86-64")))
+     (:module "boot"
+      :components ((:file "bootloader-x86-64")
+                   (:file "stage2-x86-64")))
      (:module "kernel"
       :components ((:file "interface")
                    (:file "x86-64")))

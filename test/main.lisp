@@ -1,7 +1,10 @@
 ;;;; test/main.lisp — kernel unit tests
 
 (defpackage #:ecclesia-test-kernel
-  (:use #:cl #:ecclesia #:ecclesia.build))
+  (:use #:cl
+        #:ecclesia
+        #:ecclesia.assembler
+        #:ecclesia.boot))
 (in-package #:ecclesia-test-kernel)
 
 (defun assert= (expected actual description)

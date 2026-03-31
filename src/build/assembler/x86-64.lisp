@@ -370,6 +370,18 @@
   (push-byte buf #xfe)
   (push-byte buf (logior #xc0 (enc *r8* (first args)))))
 
+;;; ── PUSH / POP (r64) ─────────────────────────────────────────────────────────
+
+;; (push-reg rax) → 0x50+r   (push-reg rbx) → 0x50+3 etc
+(definsn push-reg (args mode) 1
+         (args labels origin buf mode)
+  (push-byte buf (+ #x50 (enc *r64* (first args)))))
+
+;; (pop-reg rax) → 0x58+r
+(definsn pop-reg (args mode) 1
+         (args labels origin buf mode)
+  (push-byte buf (+ #x58 (enc *r64* (first args)))))
+
 ;;; ── Byte operations via [RBX] ───────────────────────────────────────────────
 
 ;; (mov al (byte-at-rbx))  →  0x8A 0x03  (MOV AL, [RBX])

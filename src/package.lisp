@@ -1,8 +1,10 @@
 ;;;; package.lisp — Ecclesia package definitions
 ;;;;
-;;;; ecclesia.utils — VGA helpers, common utilities
-;;;; ecclesia.build — build-time toolchain: assembler, boot code
-;;;; ecclesia       — kernel runtime: the OS itself
+;;;; ecclesia.utils         — VGA helpers, common utilities
+;;;; ecclesia.build         — build-time toolchain: assembler, boot code
+;;;; ecclesia.kernel        — ISA-agnostic kernel generics
+;;;; ecclesia.kernel.x86-64 — x86-64 implementations of the kernel generics
+;;;; ecclesia               — kernel image definitions (*kernel-main*, etc.)
 
 (defpackage #:ecclesia.utils
   (:use #:cl)
@@ -59,10 +61,60 @@
    #:page-table-forms
    #:long-mode-entry-forms))
 
+(defpackage #:ecclesia.kernel
+  (:use #:cl
+        #:ecclesia.utils)
+  (:export
+   ;; Kernel configuration (shared by all ISAs)
+   #:*prompt-str*
+   #:*prompt-row*
+   #:*vga-screen-rows*
+   #:*vga-char-attr*
+   ;; ISA descriptor protocol
+   #:isa-bits
+   #:isa-origin
+   #:isa-stack-pointer
+   #:isa-entry-prologue-forms
+   ;; Build-target selection
+   #:*build-target*
+   #:make-kernel-isa
+   #:resolve-build-target
+   ;; ISA-agnostic kernel generics — each method returns a list of asm forms
+   #:ps2-poll-forms
+   #:scancode-filter-forms
+   #:scancode-translate-forms
+   #:vga-offset-forms
+   #:vga-write-char-forms
+   #:vga-erase-char-forms
+   #:cursor-advance-forms
+   #:screen-full-check-forms
+   #:backspace-forms
+   ;; Structural generics (layout, dispatch, register save/restore)
+   #:embedded-data-forms
+   #:dispatch-to-handler-forms
+   #:save-char-forms
+   #:restore-char-forms
+   #:discard-char-forms
+   ;; Assembler meta-generics
+   #:asm-prelude-forms
+   #:unconditional-jump-forms))
+
+(defpackage #:ecclesia.kernel.x86-64
+  (:use #:cl
+        #:ecclesia.kernel
+        #:ecclesia.utils)
+  (:export
+   ;; x86-64 method specializer symbol
+   #:x86-64))
+
 (defpackage #:ecclesia
   (:use #:cl
         #:ecclesia.build
-        #:ecclesia.utils)
+        #:ecclesia.utils
+        #:ecclesia.kernel
+        #:ecclesia.kernel.x86-64)
   (:export
-   ;; Kernel entry point
-   #:*kernel64*))
+   ;; Kernel image builder — call with an ISA instance or use *build-target*
+   #:make-kernel-main
+   ;; Pre-built image for the default build target
+   #:*kernel-main*))

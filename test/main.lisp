@@ -1,8 +1,8 @@
-;;;; test/main.lisp — 64-bit kernel unit tests
+;;;; test/main.lisp — kernel unit tests
 
-(defpackage #:ecclesia-test-kernel64
+(defpackage #:ecclesia-test-kernel
   (:use #:cl #:ecclesia #:ecclesia.build))
-(in-package #:ecclesia-test-kernel64)
+(in-package #:ecclesia-test-kernel)
 
 (defun assert= (expected actual description)
   (if (equal expected actual)
@@ -14,25 +14,25 @@
         (error "Test failed: ~a" description))))
 
 (defun run-tests ()
-  (format t "~%Running kernel64 unit tests...~%~%")
+  (format t "~%Running kernel unit tests...~%~%")
 
-  (let ((img (assemble *kernel64*)))
+  (let ((img (assemble *kernel-main*)))
 
     (assert= t (> (length img) 0)
-             "Kernel64 assembles to a non-empty image")
+             "Kernel assembles to a non-empty image")
 
     (assert= t (<= (length img) (* 8 +floppy-sector-size+))
-             "Kernel64 fits within 8 sectors (4096 bytes)")
+             "Kernel fits within 8 sectors (4096 bytes)")
 
     ;; REX.W prefix (0x48) should appear (MOV RSP, imm64)
     (assert= #x48 (aref img 0)
-             "Kernel64 first byte is REX.W prefix (MOV RSP)")
+             "Kernel first byte is REX.W prefix (MOV RSP)")
 
     ;; IN AL opcode (0xE4) should appear (PS/2 keyboard polling)
     (let ((in-pos (loop for i from 0 below (length img)
                         when (= (aref img i) #xe4) return i)))
       (assert= t (not (null in-pos))
-               "Kernel64 contains IN AL (0xE4) for keyboard polling"))
+               "Kernel contains IN AL (0xE4) for keyboard polling"))
 
     ;; Scancode table should be present (contains ASCII 113='q' at index 0x10)
     ;; 113 = 0x71
@@ -41,8 +41,8 @@
                                  (= (aref img (1+ i)) 119)) ; 'w' follows
                        return i)))
       (assert= t (not (null q-pos))
-               "Kernel64 contains scancode→ASCII table (q/w at consecutive offsets)")))
+               "Kernel contains scancode→ASCII table (q/w at consecutive offsets)")))
 
-  (format t "~%All kernel64 tests passed.~%"))
+  (format t "~%All kernel tests passed.~%"))
 
 (run-tests)

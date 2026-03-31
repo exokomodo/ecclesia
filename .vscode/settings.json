@@ -9,6 +9,7 @@
         "cadr",
         "creg",
         "defconstant",
+        "defgeneric",
         "definsn",
         "defpackage",
         "defparameter",

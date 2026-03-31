@@ -8,9 +8,12 @@ MAKEFLAGS += --no-print-directory
 UNAME_S := $(shell uname -s)
 
 # Variables
-QEMU      ?= qemu-system-x86_64
-FLOPPY    ?= floppy.img
-WRITER    ?= scripts/write-kernel.lisp
+TARGET_ARCH ?= x86-64
+QEMU        ?= qemu-system-x86_64
+FLOPPY      ?= ecclesia_$(TARGET_ARCH).img
+WRITER      ?= scripts/write-kernel.lisp
+
+export TARGET_ARCH
 
 # Source files
 SOURCES   := ecclesia.asd $(wildcard src/*.lisp src/*.asm) $(WRITER)
@@ -65,7 +68,7 @@ clean: clean/floppy clean/lisp ## Remove build artifacts
 
 .PHONY: clean/floppy
 clean/floppy:
-	rm -f $(FLOPPY)
+	rm -f ecclesia_*.img
 
 .PHONY: clean/lisp
 clean/lisp: ## Force ASDF to recompile all Lisp sources on next build

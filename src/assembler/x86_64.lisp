@@ -1,4 +1,4 @@
-;;;; x86-64.lisp — x86-64 instruction encodings
+;;;; x86_64.lisp — x86_64 instruction encodings
 ;;;;
 ;;;; Registers each supported mnemonic with the generic assembler via
 ;;;; register-instruction. Covers the subset needed for Ecclesia's boot chain.

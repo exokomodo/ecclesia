@@ -4,7 +4,7 @@
 ;;;; ecclesia.assembler     — Generic assembler
 ;;;; ecclesia.boot          — boot code
 ;;;; ecclesia.kernel        — ISA-agnostic kernel generics
-;;;; ecclesia.kernel.x86-64 — x86-64 implementations of the kernel generics
+;;;; ecclesia.kernel.x86_64 — x86_64 implementations of the kernel generics
 ;;;; ecclesia.kernel.i386   — i386 (32-bit) implementations of the kernel generics
 ;;;; ecclesia               — kernel image definitions (*kernel-main*, etc.)
 
@@ -41,7 +41,7 @@
         #:ecclesia.assembler
         #:ecclesia.utils)
   (:export
-   ;; x86-64 register predicates and helpers
+   ;; x86_64 register predicates and helpers
    #:r8-p
    #:r16-p
    #:r32-p
@@ -108,11 +108,11 @@
    #:asm-prelude-forms
    #:unconditional-jump-forms))
 
-(defpackage #:ecclesia.kernel.x86-64
+(defpackage #:ecclesia.kernel.x86_64
   (:use #:cl
         #:ecclesia.kernel
         #:ecclesia.utils)
-  (:export #:x86-64))
+  (:export #:x86_64))
 
 (defpackage #:ecclesia.kernel.i386
   (:use #:cl
@@ -125,7 +125,7 @@
         #:ecclesia.assembler
         #:ecclesia.boot
         #:ecclesia.kernel
-        #:ecclesia.kernel.x86-64
+        #:ecclesia.kernel.x86_64
         #:ecclesia.kernel.i386
         #:ecclesia.utils)
   (:export

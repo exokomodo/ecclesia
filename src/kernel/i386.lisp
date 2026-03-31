@@ -1,6 +1,6 @@
 ;;;; i386.lisp — i386 (32-bit x86) implementations of the kernel generics
 ;;;;
-;;;; The i386 target shares the x86 BIOS/VGA/PS2 hardware model with x86-64
+;;;; The i386 target shares the x86 BIOS/VGA/PS2 hardware model with x86_64
 ;;;; but operates entirely in 32-bit protected mode.  Register names change
 ;;;; (rsp→esp, rbx→ebx, rdi→edi, rax→eax) and 64-bit-specific REX prefixes
 ;;;; are absent, but the ModRM encodings for [EBX]/[EDI+EDX+disp8] are
@@ -15,7 +15,7 @@
 ;;; ── PS/2 polling ─────────────────────────────────────────────────────────────
 
 (defmethod ecclesia.kernel:ps2-poll-forms ((isa i386))
-  "Same PS/2 polling as x86-64 — port I/O is identical."
+  "Same PS/2 polling as x86_64 — port I/O is identical."
   '((label kbd-poll)
     (in   al #x64)
     (test al #x01)
@@ -33,7 +33,7 @@
 ;;; ── Scancode → ASCII translation ─────────────────────────────────────────────
 
 (defmethod ecclesia.kernel:scancode-translate-forms ((isa i386))
-  "Same as x86-64 but uses EBX instead of RBX (same ModRM bytes in 32-bit)."
+  "Same as x86_64 but uses EBX instead of RBX (same ModRM bytes in 32-bit)."
   '((movzx eax al)
     (mov   ebx kbd-ascii-table)
     (add   ebx eax)

@@ -8,21 +8,21 @@
 ;;;;   2. Implement each method below for that class
 ;;;;   3. Call the generics in your *kernel<ISA>* parameter
 ;;;;
-;;;; No methods are defined here — see kernel/x86-64.lisp for the x86-64
+;;;; No methods are defined here — see kernel/x86_64.lisp for the x86_64
 ;;;; implementations.
 
 (in-package #:ecclesia.kernel)
 
 ;;; ── Build-target selection ──────────────────────────────────────────────────
 
-(defparameter *build-target* :x86-64
+(defparameter *build-target* :x86_64
   "Keyword identifying the target ISA for the current build.
-   Supported values: :x86-64
+   Supported values: :x86_64
    Set this before calling resolve-build-target to select the implementation.")
 
 (defgeneric make-kernel-isa (target)
   (:documentation
-   "Return a fresh ISA instance for TARGET (a keyword such as :x86-64).
+   "Return a fresh ISA instance for TARGET (a keyword such as :x86_64).
     Each ISA package provides an EQL-specialised method for its own keyword."))
 
 (defun resolve-build-target ()
@@ -62,7 +62,7 @@
 (defgeneric ps2-poll-forms (isa)
   (:documentation
    "Return forms that spin until PS/2 has a byte ready, then read it into
-    a scratch register.  On x86-64 this polls port 0x64 and reads port 0x60."))
+    a scratch register.  On x86_64 this polls port 0x64 and reads port 0x60."))
 
 (defgeneric scancode-filter-forms (isa)
   (:documentation
@@ -79,7 +79,7 @@
   (:documentation
    "Return forms that compute the VGA text buffer byte offset for the current
     cursor position (row, col).  Result left in a scratch register (EDX on
-    x86-64).  Clobbers ISA-specific scratch registers."))
+    x86_64).  Clobbers ISA-specific scratch registers."))
 
 (defgeneric vga-write-char-forms (isa)
   (:documentation

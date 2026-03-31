@@ -9,7 +9,7 @@
 ;;;;   Sectors 10+  (0x1200): kernel                  (padded to sector boundary)
 ;;;;   Remainder:             zero-padded to 1.44MB
 ;;;;
-;;;; TARGET_ARCH environment variable selects the build target (default: x86-64).
+;;;; TARGET_ARCH environment variable selects the build target (default: x86_64).
 
 (require 'asdf)
 (pushnew (truename "./") asdf:*central-registry* :test #'equal)
@@ -27,7 +27,7 @@
     (replace result bytes)
     result))
 
-(let* ((target-arch  (or (sb-ext:posix-getenv "TARGET_ARCH") "x86-64"))
+(let* ((target-arch  (or (sb-ext:posix-getenv "TARGET_ARCH") "x86_64"))
        (arch-keyword (intern (string-upcase target-arch) :keyword)))
 
   (format t "[ecclesia] Assembling Stage 1 (MBR)...~%")
@@ -39,7 +39,7 @@
     (format t "[ecclesia] Assembling Stage 2 [~a]...~%" target-arch)
     (let ((stage2 (pad-to-sector
                    (assemble (ecase arch-keyword
-                               (:x86-64 *stage2*)
+                               (:x86_64 *stage2*)
                                (:i386   *stage2-i386*))))))
       (when (> (length stage2) +stage2-size+)
         (error "Stage 2 too large: ~d bytes (max ~d)" (length stage2) +stage2-size+))
@@ -49,7 +49,7 @@
       (setf *kernel-main*  (make-kernel-main))
       (let* ((kernel       (pad-to-sector (assemble *kernel-main*)))
              (content-size (+ +floppy-sector-size+ +stage2-size+ (length kernel)))
-             (output-path  (format nil "ecclesia_~a.img" target-arch)))
+             (output-path  (format nil "ecclesia-~a.img" target-arch)))
 
         (format t "[ecclesia] Writing ~a (~d bytes / 1.44MB)...~%~%"
                 output-path +floppy-total-size+)

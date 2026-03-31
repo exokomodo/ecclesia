@@ -10,7 +10,7 @@ without touching the core.
 ```plaintext
 src/assembler/
   assembler.lisp   — generic two-pass core
-  x86-64.lisp      — x86-64 instruction encodings
+  x86_64.lisp      — x86_64 instruction encodings
 ```
 
 ### assembler.lisp — the core
@@ -33,9 +33,9 @@ Reserved forms handled directly by the core (not in the instruction table):
 | `(org ADDR)`   | Set the load origin address               |
 | `(label NAME)` | Define a label at the current address     |
 
-### x86-64.lisp — instruction encodings
+### x86_64.lisp — instruction encodings
 
-Registers all x86-64 instructions using the `definsn` macro and
+Registers all x86_64 instructions using the `definsn` macro and
 `register-instruction`. Each instruction specifies:
 
 - A **size form** — how many bytes this instruction produces (may depend on `mode` and operands)
@@ -83,7 +83,7 @@ src/assembler/riscv.lisp
 ```lisp
 (:module "assembler"
  :components ((:file "assembler")
-              (:file "x86-64")
+              (:file "x86_64")
               (:file "riscv")))   ; ← add here
 ```
 
@@ -137,6 +137,6 @@ The assembler tracks a `*asm-bits*` variable (default 16). Change it with:
 (bits 64)   ; switch to 64-bit
 ```
 
-x86-64 uses `*asm-bits*` to decide whether to emit operand-size prefixes
+x86_64 uses `*asm-bits*` to decide whether to emit operand-size prefixes
 (e.g. `0x66` before 16-bit register moves in 32-bit mode). Other architectures
 can use or ignore it as appropriate.

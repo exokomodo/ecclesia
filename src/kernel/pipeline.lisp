@@ -14,13 +14,32 @@
 (in-package #:ecclesia.kernel)
 
 ;;; ── Kernel configuration ────────────────────────────────────────────────────
-;;; Defined here so all ISA implementations can reference them without
-;;; depending on the ecclesia package (which loads after them).
 
 (defparameter *prompt-str*       "ecclesia> ")
 (defparameter *prompt-row*       23)
 (defparameter *vga-screen-rows*  25)
 (defparameter *vga-char-attr*    #x0f)   ; white on black
+
+;;; ── ISA descriptor protocol ─────────────────────────────────────────────────
+;;;
+;;; An ISA class carries build-target metadata alongside the pipeline methods.
+;;; This lets make-kernel-forms select the right implementation and emit
+;;; correct entry-point prologue (origin address, stack, etc.) without
+;;; the caller having to know ISA details.
+
+(defgeneric isa-origin (isa)
+  (:documentation "Physical load address of the kernel image."))
+
+(defgeneric isa-stack-pointer (isa)
+  (:documentation "Initial stack pointer value."))
+
+(defgeneric isa-bits (isa)
+  (:documentation "Assembler bit width directive value (16, 32, or 64)."))
+
+(defgeneric isa-entry-prologue-forms (isa)
+  (:documentation
+   "Return forms that set up the minimal runtime environment before the kernel
+    main loop — stack pointer, any baseline register state, etc."))
 
 ;;; ── Pipeline generics ───────────────────────────────────────────────────────
 
@@ -72,3 +91,19 @@
     - If cursor is off-screen, snap back to the last visible cell.
     - If cursor is at or before the prompt edge, ignore the keypress.
     - Otherwise decrement the column and erase the vacated cell."))
+
+;;; ── Build-target selection ──────────────────────────────────────────────────
+
+(defparameter *build-target* :x86-64
+  "Keyword identifying the target ISA for the current build.
+   Supported values: :x86-64
+   Set this before calling resolve-build-target to select the implementation.")
+
+(defgeneric make-kernel-isa (target)
+  (:documentation
+   "Return a fresh ISA instance for TARGET (a keyword such as :x86-64).
+    Each ISA package provides an EQL-specialised method for its own keyword."))
+
+(defun resolve-build-target ()
+  "Return an ISA instance for the current *build-target*."
+  (make-kernel-isa *build-target*))

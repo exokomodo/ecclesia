@@ -137,3 +137,18 @@
     (label kbd-bs-erase)
     ,@(ecclesia.kernel:vga-offset-forms isa)
     ,@(ecclesia.kernel:vga-erase-char-forms isa)))
+
+;;; ── ISA descriptor ───────────────────────────────────────────────────────────
+
+(defmethod ecclesia.kernel:make-kernel-isa ((target (eql :x86-64)))
+  "Return the x86-64 ISA instance for the :x86-64 build target keyword."
+  (make-instance 'x86-64))
+
+(defmethod ecclesia.kernel:isa-bits ((isa x86-64))          64)
+(defmethod ecclesia.kernel:isa-origin ((isa x86-64))        #x100000)
+(defmethod ecclesia.kernel:isa-stack-pointer ((isa x86-64)) #x200000)
+
+(defmethod ecclesia.kernel:isa-entry-prologue-forms ((isa x86-64))
+  "x86-64 kernel prologue: set RSP and load VGA base into RDI."
+  `((mov rsp ,(ecclesia.kernel:isa-stack-pointer isa))
+    (mov rdi ,+vga-base+)))

@@ -70,6 +70,15 @@
    #:*prompt-row*
    #:*vga-screen-rows*
    #:*vga-char-attr*
+   ;; ISA descriptor protocol
+   #:isa-bits
+   #:isa-origin
+   #:isa-stack-pointer
+   #:isa-entry-prologue-forms
+   ;; Build-target selection
+   #:*build-target*
+   #:make-kernel-isa
+   #:resolve-build-target
    ;; ISA-agnostic kernel pipeline — each method returns a list of asm forms
    #:ps2-poll-forms
    #:scancode-filter-forms
@@ -96,5 +105,7 @@
         #:ecclesia.kernel
         #:ecclesia.kernel.x86-64)
   (:export
-   ;; Kernel entry point
+   ;; Kernel image builder — call with an ISA instance or use *build-target*
+   #:make-kernel-main
+   ;; Pre-built image for the default build target
    #:*kernel-main*))

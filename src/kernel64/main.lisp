@@ -83,6 +83,9 @@
     (test  al al)
     (jz    kbd-main-loop)
 
+    ;; Debug: got a mapped ASCII char — write '@' at row 5 col 2
+    (mov-rdi-word #x324 ,(logior (char-code #\@) #x0e00))
+
     ;; Save ASCII char in BL (survives the cursor loads below)
     (mov   bl al)
 

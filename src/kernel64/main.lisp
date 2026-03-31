@@ -72,28 +72,12 @@
     (test  al al)
     (jz    kbd-main-loop)
 
-    ;; ── Write char to VGA at cursor position ────────────────────────────────
-    ;; Save char on the stack (RBX will be clobbered by cursor loads)
-    (push-reg rax)
-
-    ;; Load cursor position
-    (mov   rbx kbd-cursor-col)
-    (byte-loadsx-ecx-rbx)              ; ECX = col
-    (mov   rbx kbd-cursor-row)
-    (byte-loadsx-edx-rbx)              ; EDX = row
-
-    ;; VGA offset = (row*80 + col)*2
-    (imul  edx #x50)
-    (add   edx ecx)
-    (imul  edx #x02)
-
-    ;; Restore char
-    (pop-reg rax)
-
-    ;; Reload RDI (just in case)
+    ;; Simplified: write character directly at row 5 col 10
+    ;; Row 5 col 10: offset = (5*80+10)*2 = 820 = 0x334
+    (mov   edx #x334)
     (mov   rdi #xb8000)
 
-    ;; Write char + attr
+    ;; Write char + attr (white on black)
     (store-rdi-edx-al 0)
     (store-rdi-edx-byte 1 #x0f)
 

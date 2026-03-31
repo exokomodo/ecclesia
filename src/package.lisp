@@ -1,7 +1,8 @@
 ;;;; package.lisp — Ecclesia package definitions
 ;;;;
 ;;;; ecclesia.utils         — VGA helpers, common utilities
-;;;; ecclesia.build         — build-time toolchain: assembler, boot code
+;;;; ecclesia.assembler     — Generic assembler
+;;;; ecclesia.boot          — boot code
 ;;;; ecclesia.kernel        — ISA-agnostic kernel generics
 ;;;; ecclesia.kernel.x86-64 — x86-64 implementations of the kernel generics
 ;;;; ecclesia               — kernel image definitions (*kernel-main*, etc.)
@@ -21,7 +22,7 @@
    #:vga-rdi-write
    #:vga-rdi-status))
 
-(defpackage #:ecclesia.build
+(defpackage #:ecclesia.assembler
   (:use #:cl
         #:ecclesia.utils)
   (:export
@@ -32,7 +33,13 @@
    #:eval-expr
    #:register-instruction
    #:*asm-bits*
-   #:*instruction-table*
+   #:*instruction-table*))
+
+(defpackage #:ecclesia.boot
+  (:use #:cl
+        #:ecclesia.assembler
+        #:ecclesia.utils)
+  (:export
    ;; x86-64 register predicates and helpers
    #:r8-p
    #:r16-p
@@ -109,10 +116,11 @@
 
 (defpackage #:ecclesia
   (:use #:cl
-        #:ecclesia.build
-        #:ecclesia.utils
+        #:ecclesia.assembler
+        #:ecclesia.boot
         #:ecclesia.kernel
-        #:ecclesia.kernel.x86-64)
+        #:ecclesia.kernel.x86-64
+        #:ecclesia.utils)
   (:export
    ;; Kernel image builder — call with an ISA instance or use *build-target*
    #:make-kernel-main

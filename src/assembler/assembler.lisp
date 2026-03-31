@@ -13,7 +13,7 @@
 ;;;;
 ;;;; To add new instruction sets, call register-instruction for each mnemonic.
 
-(in-package #:ecclesia.build)
+(in-package #:ecclesia.assembler)
 
 ;;; ── Instruction table ───────────────────────────────────────────────────────
 
@@ -25,14 +25,14 @@
   (setf (gethash mnemonic *instruction-table*) (list size-fn emit-fn)))
 
 (defun canonicalize-symbol (sym)
-  "Intern SYM into the ecclesia.build package.
+  "Intern SYM into the ecclesia.boot package.
    Works for both mnemonics and register/operand symbols."
   (if (symbolp sym)
-      (intern (symbol-name sym) '#:ecclesia.build)
+      (intern (symbol-name sym) '#:ecclesia.boot)
       sym))
 
 (defun canonicalize-mnemonic (sym)
-  "Intern mnemonic SYM into ecclesia.build."
+  "Intern mnemonic SYM into ecclesia.boot."
   (canonicalize-symbol sym))
 
 (defun canonicalize-form (form)

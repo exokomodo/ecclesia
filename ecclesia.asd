@@ -18,7 +18,7 @@
         :components ((:file "bootloader-x86-64")
                      (:file "stage2-x86-64")))))
      (:module "kernel"
-      :components ((:file "main")))))))
+      :components ((:file "kernel64")))))))
 
 (defsystem ecclesia/test
   :description "Ecclesia unit tests."

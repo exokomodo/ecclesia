@@ -1,4 +1,4 @@
-;;; boot.lisp — Ecclesia bare-metal entry point
+;;; main.lisp — Ecclesia bare-metal entry point
 ;;;
 ;;; This file is loaded by the SBCL bare-metal runtime immediately after
 ;;; the assembly stub hands off control. It initializes the kernel

@@ -72,25 +72,31 @@
     (test  al al)
     (jz    kbd-main-loop)
 
-    ;; Simplified: write character directly at row-col
-    (mov   edx ,(vga-offset 6 10))
-    (mov   rdi #xb8000)
+    ;; ── Write char at cursor position ────────────────────────────────────────
+    ;; AL = ASCII char.  Save it on the stack so cursor loads can use EAX.
+    (push-reg rax)
 
-    ;; Write char + attr (white on black)
+    ;; Load cursor row → EDX, cursor col → ECX
+    (mov   rbx kbd-cursor-row)
+    (byte-loadsx-edx-rbx)              ; EDX = row
+    (mov   rbx kbd-cursor-col)
+    (byte-loadsx-ecx-rbx)              ; ECX = col
+
+    ;; VGA offset = (row * 80 + col) * 2
+    (imul  edx ,(* 2 +vga-cols+))      ; EDX = row * 160
+    (imul  ecx #x02)                   ; ECX = col * 2
+    (add   edx ecx)                    ; EDX = byte offset
+
+    ;; Restore char into AL
+    (pop-reg rax)
+
+    ;; Write char + attr
+    (mov   rdi ,+vga-base+)
     (store-rdi-edx-al 0)
     (store-rdi-edx-byte 1 #x0f)
 
-    ;; ── Advance cursor ───────────────────────────────────────────────────────
+    ;; ── Advance cursor col ───────────────────────────────────────────────────
     (mov   rbx kbd-cursor-col)
     (inc-byte-rbx)
-    (byte-loadsx-ecx-rbx)
-    (cmp8  cl #x50)
-    (jnc   kbd-wrap)
-    (jmp   abs kbd-main-loop)
 
-    (label kbd-wrap)
-    (store-zero-rbx)
-    (mov   rbx kbd-cursor-row)
-    (inc-byte-rbx)
-
-    (jmp abs kbd-main-loop)))
+    (jmp   abs kbd-main-loop)))

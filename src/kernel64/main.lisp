@@ -135,15 +135,15 @@
     (mov   rbx kbd-cursor-row)
     (inc-byte-rbx)
 
-    ;; Check if row >= 25 — screen full, stop accepting input
+    ;; Check if row >= 25 — screen full, reject the char
     (byte-loadsx-ecx-rbx)              ; ECX = new row
     (cmp8  cl #x19)                    ; row >= 25?
     (jc    kbd-no-wrap)                ; no — continue
 
-    ;; Screen full: spin forever
-    (label kbd-full)
-    (hlt)
-    (jmp   short kbd-full)
+    ;; Screen full: undo row increment, pin cursor at end of last row
+    (dec-byte-rbx)                     ; row back to 24
+    (mov   rbx kbd-cursor-col)
+    (store-byte-rbx ,(1- +vga-cols+))  ; col = 79 (last valid column)
 
     (label kbd-no-wrap)
     (jmp   abs kbd-main-loop)))

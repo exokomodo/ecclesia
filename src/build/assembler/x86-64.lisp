@@ -424,6 +424,11 @@
          (args labels origin buf mode)
   (push-byte buf #xc6) (push-byte buf #x03) (push-byte buf #x00))
 
+;; (store-byte-rbx imm8)  →  0xC6 0x03 imm8  (MOV BYTE PTR [RBX], imm8)
+(definsn store-byte-rbx (args mode) 3
+         (args labels origin buf mode)
+  (push-byte buf #xc6) (push-byte buf #x03) (push-byte buf (logand (first args) #xff)))
+
 ;;; ── VGA byte store: [RDI+EDX+disp8] ────────────────────────────────────────
 ;; Used to write char and attr bytes at computed VGA offsets.
 ;;

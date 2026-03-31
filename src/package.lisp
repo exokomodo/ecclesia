@@ -94,7 +94,10 @@
    #:dispatch-to-handler-forms
    #:save-char-forms
    #:restore-char-forms
-   #:discard-char-forms))
+   #:discard-char-forms
+   ;; Assembler meta-generics
+   #:asm-prelude-forms
+   #:unconditional-jump-forms))
 
 (defpackage #:ecclesia.kernel.x86-64
   (:use #:cl

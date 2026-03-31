@@ -1,8 +1,8 @@
 ;;;; main.lisp — kernel entry point (ISA-agnostic)
 ;;;;
-;;;; This file contains NO ISA-specific instructions.  Every step is a call
-;;;; to a generic from ecclesia.kernel, dispatched on the ISA instance
-;;;; produced by (resolve-build-target).
+;;;; This file contains NO ISA-specific instructions, directives, or encodings.
+;;;; Every construct delegates to an ecclesia.kernel generic dispatched on
+;;;; the ISA instance produced by (resolve-build-target).
 ;;;;
 ;;;; To build for a different ISA:
 ;;;;   (setf ecclesia.kernel:*build-target* :arm64)
@@ -12,8 +12,7 @@
 
 ;;; ── Scancode table data ──────────────────────────────────────────────────────
 ;;;
-;;; The raw table lives here rather than in ecclesia.kernel because the
-;;; keyboard layout is an application-level concern, not an ISA concern.
+;;; The keyboard layout is an application-level concern, not an ISA concern.
 ;;; The embedded-data-forms generic decides how it is laid out in memory.
 
 ;;; US QWERTY scancode set 1 → ASCII, unshifted (89 entries: 0x00–0x58)
@@ -33,19 +32,18 @@
 
 (defun make-kernel-main (&optional (isa (resolve-build-target)))
   "Return the kernel assembler form list for ISA (default: *build-target*).
-   Every line delegates to an ecclesia.kernel generic — no ISA assumptions here."
-  `(;; ── Entry point ──────────────────────────────────────────────────────────
-    (bits ,(isa-bits isa))
-    (org  ,(isa-origin isa))
+   Every line is a generic call — no ISA assumptions in this function."
+  `(;; ── Assembler prelude (bit width, origin) ─────────────────────────────────
+    ,@(asm-prelude-forms isa)
 
-    ;; ISA-specific setup: stack, baseline registers
+    ;; ── ISA-specific runtime setup ────────────────────────────────────────────
     ,@(isa-entry-prologue-forms isa)
 
-    ;; Print the prompt
+    ;; ── Print the prompt ──────────────────────────────────────────────────────
     ,@(vga-rdi-write *prompt-str* :row *prompt-row* :col 0 :attr #x0a)
 
-    ;; Jump over embedded data
-    (jmp abs kbd-main-loop)
+    ;; ── Jump over embedded data ───────────────────────────────────────────────
+    ,@(unconditional-jump-forms isa 'kbd-main-loop)
 
     ;; ── Embedded data (layout determined by ISA) ──────────────────────────────
     ,@(embedded-data-forms isa (scancode-db-forms))
@@ -68,7 +66,7 @@
     ;; ── Backspace handler ─────────────────────────────────────────────────────
     (label kbd-backspace)
     ,@(backspace-forms isa)
-    (jmp abs kbd-main-loop)
+    ,@(unconditional-jump-forms isa 'kbd-main-loop)
 
     ;; ── Printable character handler ───────────────────────────────────────────
     (label kbd-printable)
@@ -86,12 +84,12 @@
 
     ;; 8. Advance cursor
     ,@(cursor-advance-forms isa)
-    (jmp abs kbd-main-loop)
+    ,@(unconditional-jump-forms isa 'kbd-main-loop)
 
     ;; ── Screen full: discard saved char and loop ───────────────────────────────
     (label kbd-full)
     ,@(discard-char-forms isa)
-    (jmp abs kbd-main-loop)))
+    ,@(unconditional-jump-forms isa 'kbd-main-loop)))
 
 ;;; Eagerly build the kernel image for the default build target.
 (defparameter *kernel-main* (make-kernel-main))

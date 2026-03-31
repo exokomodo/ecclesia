@@ -179,3 +179,12 @@
 (defmethod ecclesia.kernel:discard-char-forms ((isa x86-64))
   "Pop and discard the saved ASCII char from the stack."
   '((pop-reg rax)))
+
+(defmethod ecclesia.kernel:asm-prelude-forms ((isa x86-64))
+  "x86-64 assembler prelude: 64-bit mode declaration and load origin."
+  `((bits ,(ecclesia.kernel:isa-bits isa))
+    (org  ,(ecclesia.kernel:isa-origin isa))))
+
+(defmethod ecclesia.kernel:unconditional-jump-forms ((isa x86-64) label)
+  "x86-64 unconditional near jump."
+  `((jmp abs ,label)))

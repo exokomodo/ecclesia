@@ -137,3 +137,14 @@
   (:documentation
    "Return forms that discard a previously saved character (used on the
     screen-full and other bail-out paths)."))
+
+(defgeneric asm-prelude-forms (isa)
+  (:documentation
+   "Return assembler directive forms that must appear at the very start of the
+    image: bit-width declaration and origin address.  These are not instructions
+    but assembler metadata that every ISA image requires."))
+
+(defgeneric unconditional-jump-forms (isa label)
+  (:documentation
+   "Return forms that perform an unconditional jump to LABEL.
+    The encoding (near, far, etc.) is ISA-specific."))

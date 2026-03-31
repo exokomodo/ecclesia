@@ -152,16 +152,27 @@
 
 ;;; ── TEST ────────────────────────────────────────────────────────────────────
 
-(definsn test (args mode) 2
+(definsn test (args mode)
+         (cond ((and (eq (first args) 'al) (numberp (second args))) 2)  ; TEST AL, imm8
+               (t 2))  ; TEST r8, r8
          (args labels origin buf mode)
-  (push-byte buf #x84)
-  (push-byte buf #xc0))  ; AL, AL only for now
+  (let ((dst (first args)) (src (second args)))
+    (cond
+      ;; TEST AL, imm8  →  0xA8 imm8
+      ((and (eq dst 'al) (numberp src))
+       (push-byte buf #xa8)
+       (push-byte buf (logand src #xff)))
+      ;; TEST r8, r8  →  0x84 /r
+      (t
+       (push-byte buf #x84)
+       (push-byte buf #xc0)))))
 
 ;;; ── MOV ─────────────────────────────────────────────────────────────────────
 
 (defun mov-size (dst src mode)
   (cond
     ((and (r8-p dst)   (numberp src))                    2)
+    ((and (r8-p dst)   (r8-p src))                       2)
     ((sreg-p dst)                       (if (= mode 16)  2  3))
     ((and (r16-p dst)  (numberp src))   (if (= mode 16)  3  4))
     ((and (r16-p dst)  (r16-p src))     (if (= mode 16)  2  3))
@@ -171,7 +182,7 @@
     ((and (r32-p dst)  (r32-p src))                      2)
     ((and (listp dst) (eq (car dst) 'mem32) (r32-p src)) 6)
     ((and (listp dst) (eq (car dst) 'mem32) (numberp src)) 10)
-    ((and (r64-p dst)  (numberp src))                    10)
+    ((and (r64-p dst) (or (numberp src) (symbolp src)))  10)
     (t (error "Unknown MOV: ~a ~a" dst src))))
 
 (definsn mov (args mode)
@@ -182,6 +193,9 @@
       ((and (r8-p dst) (numberp src))
        (push-byte buf (+ #xb0 (enc *r8* dst)))
        (push-byte buf (logand src #xff)))
+      ((and (r8-p dst) (r8-p src))
+       (push-byte buf #x88)
+       (push-byte buf (logior #xc0 (ash (enc *r8* src) 3) (enc *r8* dst))))
       ((sreg-p dst)
        (maybe-66 buf mode)
        (push-byte buf #x8e)
@@ -214,10 +228,10 @@
        (push-byte buf #xc7) (push-byte buf #x05)
        (push-u32 buf (eval-expr (second dst) labels))
        (push-u32 buf src))
-      ((and (r64-p dst) (numberp src))
+      ((and (r64-p dst) (or (numberp src) (symbolp src)))
        (push-byte buf #x48)
        (push-byte buf (+ #xb8 (enc *r64* dst)))
-       (push-u64 buf src)))))
+       (push-u64 buf (eval-expr src labels))))))
 
 ;;; ── OR ──────────────────────────────────────────────────────────────────────
 
@@ -266,9 +280,19 @@
   (push-u32 buf (first args))
   (push-u16 buf (second args)))
 
-;;; ── Conditional short jumps ──────────────────────────────────────────────────
+;;; ── Conditional jumps (always near = 6 bytes) ──────────────────────────────
+;;; Use (jz-short label) for the 2-byte short form in tight code (Stage 1).
 
-(macrolet ((cjmp (mnem opcode)
+(macrolet ((cjmp-near (mnem short-op)
+             (let ((near-op (+ short-op #x10)))
+               `(definsn ,mnem (args mode) 6
+                         (args labels origin buf mode)
+                  (let* ((tgt (resolve labels (first args)))
+                         (rel (- tgt (+ (cur-addr origin buf) 6))))
+                    (push-byte buf #x0f)
+                    (push-byte buf ,near-op)
+                    (push-u32  buf (logand rel #xffffffff))))))
+           (cjmp-short (mnem opcode)
              `(definsn ,mnem (args mode) 2
                        (args labels origin buf mode)
                 (let* ((tgt (resolve labels (first args)))
@@ -277,16 +301,181 @@
                     (error "~a out of range to ~a (rel=~d)" ',mnem (first args) rel))
                   (push-byte buf ,opcode)
                   (push-byte buf (logand rel #xff))))))
-  (cjmp jz  #x74)
-  (cjmp jnz #x75)
-  (cjmp jc  #x72)
-  (cjmp jnc #x73))
+  (cjmp-near jz   #x74)
+  (cjmp-near jnz  #x75)
+  (cjmp-near jc   #x72)
+  (cjmp-near jnc  #x73)
+  ;; Short variants for size-constrained code
+  (cjmp-short jz-short  #x74)
+  (cjmp-short jnz-short #x75)
+  (cjmp-short jc-short  #x72)
+  (cjmp-short jnc-short #x73))
+
+;;; ── CMP ─────────────────────────────────────────────────────────────────────
+
+;; (cmp8 al imm8)  →  0x3C imm8
+(definsn cmp8 (args mode)
+         (if (eq (first args) 'al) 2 3)    ; AL=2 bytes, CL=3 bytes
+         (args labels origin buf mode)
+  (cond
+    ((eq (first args) 'al)
+     (push-byte buf #x3c)                  ; CMP AL, imm8
+     (push-byte buf (logand (second args) #xff)))
+    ((eq (first args) 'cl)
+     (push-byte buf #x80)                  ; CMP r/m8, imm8
+     (push-byte buf #xf9)                  ; ModRM: mod=11 /7 r/m=CL
+     (push-byte buf (logand (second args) #xff)))
+    (t (error "CMP8 only supports AL or CL, got ~a" (first args)))))
+
+;;; ── JNB / JAE (jump if not below = jump if carry clear) ────────────────────
+;; Additional conditional jumps (always near).
+(macrolet ((cjmp-near (mnem short-op)
+             (let ((near-op (+ short-op #x10)))
+               `(definsn ,mnem (args mode) 6
+                         (args labels origin buf mode)
+                  (let* ((tgt (resolve labels (first args)))
+                         (rel (- tgt (+ (cur-addr origin buf) 6))))
+                    (push-byte buf #x0f)
+                    (push-byte buf ,near-op)
+                    (push-u32  buf (logand rel #xffffffff)))))))
+  (cjmp-near jge  #x7d)    ; jump if >=  (signed)
+  (cjmp-near jle  #x7e)    ; jump if <=
+  (cjmp-near ja   #x77)    ; jump if above (unsigned)
+  (cjmp-near jbe  #x76))   ; jump if below or equal
+
+;;; ── MOVZX ───────────────────────────────────────────────────────────────────
+
+;; (movzx eax al)   →  0x0F 0xB6 0xC0   (r32←r8, mod=11)
+(definsn movzx (args mode)
+         (cond ((and (r32-p (first args)) (r8-p (second args))) 3)
+               (t (error "Unknown MOVZX form: ~a ~a" (first args) (second args))))
+         (args labels origin buf mode)
+  (let ((dst (first args)) (src (second args)))
+    (push-byte buf #x0f) (push-byte buf #xb6)
+    (push-byte buf (logior #xc0 (ash (enc *r32* dst) 3) (enc *r8* src)))))
+
+;;; ── ADD ──────────────────────────────────────────────────────────────────────
+
+(definsn add (args mode)
+         (cond ((and (r32-p (first args)) (r32-p (second args))) 2)
+               ((and (r64-p (first args)) (r64-p (second args))) 3)  ; REX.W + 0x01
+               (t (error "Unknown ADD form: ~a ~a" (first args) (second args))))
+         (args labels origin buf mode)
+  (let ((dst (first args)) (src (second args)))
+    (cond
+      ((and (r64-p dst) (r64-p src))
+       (push-byte buf #x48)   ; REX.W
+       (push-byte buf #x01)
+       (push-byte buf (logior #xc0 (ash (enc *r64* src) 3) (enc *r64* dst))))
+      (t
+       (push-byte buf #x01)
+       (push-byte buf (logior #xc0 (ash (enc *r32* src) 3) (enc *r32* dst)))))))
+
+;;; ── IMUL (r32, imm32) ────────────────────────────────────────────────────────
+
+;; (imul edx #xa0)  →  0x69 /r imm32  (3-operand: dst=dst, src=dst, imm)
+(definsn imul (args mode) 6
+         (args labels origin buf mode)
+  (let ((dst (first args)) (imm (second args)))
+    (push-byte buf #x69)
+    (push-byte buf (logior #xc0 (ash (enc *r32* dst) 3) (enc *r32* dst)))
+    (push-u32 buf imm)))
+
+;;; ── INC ─────────────────────────────────────────────────────────────────────
+
+;; (inc al)  →  0xFE /0  (INC r/m8, mod=11)
+(definsn inc (args mode)
+         (if (r8-p (first args)) 2 (error "Unknown INC form"))
+         (args labels origin buf mode)
+  (push-byte buf #xfe)
+  (push-byte buf (logior #xc0 (enc *r8* (first args)))))
+
+;;; ── PUSH / POP (r64) ─────────────────────────────────────────────────────────
+
+;; (push-reg rax) → 0x50+r   (push-reg rbx) → 0x50+3 etc
+(definsn push-reg (args mode) 1
+         (args labels origin buf mode)
+  (push-byte buf (+ #x50 (enc *r64* (first args)))))
+
+;; (pop-reg rax) → 0x58+r
+(definsn pop-reg (args mode) 1
+         (args labels origin buf mode)
+  (push-byte buf (+ #x58 (enc *r64* (first args)))))
+
+;;; ── Byte operations via [RBX] ───────────────────────────────────────────────
+
+;; (mov al (byte-at-rbx))  →  0x8A 0x03  (MOV AL, [RBX])
+(definsn byte-load-al-rbx (args mode) 2
+         (args labels origin buf mode)
+  (push-byte buf #x8a) (push-byte buf #x03))
+
+;; (movzx eax (byte-at-rbx))  →  0x0F 0xB6 0x03
+(definsn byte-loadsx-eax-rbx (args mode) 3
+         (args labels origin buf mode)
+  (push-byte buf #x0f) (push-byte buf #xb6) (push-byte buf #x03))
+
+;; (movzx ecx (byte-at-rbx))  →  0x0F 0xB6 0x0B
+(definsn byte-loadsx-ecx-rbx (args mode) 3
+         (args labels origin buf mode)
+  (push-byte buf #x0f) (push-byte buf #xb6) (push-byte buf #x0b))
+
+;; (movzx edx (byte-at-rbx))  →  0x0F 0xB6 0x13
+(definsn byte-loadsx-edx-rbx (args mode) 3
+         (args labels origin buf mode)
+  (push-byte buf #x0f) (push-byte buf #xb6) (push-byte buf #x13))
+
+;; (inc-byte-rbx)  →  0xFE 0x03  (INC BYTE PTR [RBX])
+(definsn inc-byte-rbx (args mode) 2
+         (args labels origin buf mode)
+  (push-byte buf #xfe) (push-byte buf #x03))
+
+;; (dec-byte-rbx)  →  0xFE 0x0B  (DEC BYTE PTR [RBX])
+(definsn dec-byte-rbx (args mode) 2
+         (args labels origin buf mode)
+  (push-byte buf #xfe) (push-byte buf #x0b))
+
+;; (store-zero-rbx)  →  0xC6 0x03 0x00  (MOV BYTE PTR [RBX], 0)
+(definsn store-zero-rbx (args mode) 3
+         (args labels origin buf mode)
+  (push-byte buf #xc6) (push-byte buf #x03) (push-byte buf #x00))
+
+;; (store-byte-rbx imm8)  →  0xC6 0x03 imm8  (MOV BYTE PTR [RBX], imm8)
+(definsn store-byte-rbx (args mode) 3
+         (args labels origin buf mode)
+  (push-byte buf #xc6) (push-byte buf #x03) (push-byte buf (logand (first args) #xff)))
+
+;;; ── VGA byte store: [RDI+EDX+disp8] ────────────────────────────────────────
+;; Used to write char and attr bytes at computed VGA offsets.
+;;
+;; (store-rdi-edx-byte <disp8> <imm8>)
+;; MOV BYTE PTR [RDI+EDX+disp8], imm8
+;; 0xC6 ModRM(mod=01,reg=0,r/m=4) SIB(scale=0,idx=EDX,base=RDI) disp8 imm8
+;; ModRM = 0x44, SIB = 0x17
+(definsn store-rdi-edx-byte (args mode) 5
+         (args labels origin buf mode)
+  (let ((disp (first args)) (imm (second args)))
+    (push-byte buf #xc6)
+    (push-byte buf #x44)    ; ModRM: mod=01 reg=0 r/m=4(SIB)
+    (push-byte buf #x17)    ; SIB: scale=0 idx=RDX(2) base=RDI(7)
+    (push-byte buf (logand disp #xff))
+    (push-byte buf (logand imm  #xff))))
+
+;; (store-rdi-edx-al <disp8>)
+;; MOV BYTE PTR [RDI+EDX+disp8], AL
+;; 0x88 ModRM(mod=01,reg=0(AL),r/m=4) SIB disp8
+(definsn store-rdi-edx-al (args mode) 4
+         (args labels origin buf mode)
+  (let ((disp (first args)))
+    (push-byte buf #x88)
+    (push-byte buf #x44)
+    (push-byte buf #x17)
+    (push-byte buf (logand disp #xff))))
 
 ;;; ── JMP ─────────────────────────────────────────────────────────────────────
 
 (definsn jmp (args mode)
          (cond ((eq (first args) 'far)   (if (= mode 16) 5 7))
-               ((eq (first args) 'abs)   3)
+               ((eq (first args) 'abs)   (if (= mode 64) 5 3))
                ((eq (first args) 'short) 2)
                (t (error "Unknown JMP form")))
          (args labels origin buf mode)
@@ -298,10 +487,13 @@
          (push-u32 buf (logand (resolve labels (third args)) #xffffffff)))
      (push-u16 buf (logand (second args) #xffff)))
     ((eq (first args) 'abs)
-     (let* ((target (second args))
-            (rel    (- target (+ (cur-addr origin buf) 3))))
+     (let* ((instr-size (if (= mode 64) 5 3))
+            (target (eval-expr (second args) labels))
+            (rel    (- target (+ (cur-addr origin buf) instr-size))))
        (push-byte buf #xe9)
-       (push-u16 buf (logand rel #xffff))))
+       (if (= mode 64)
+           (push-u32 buf (logand rel #xffffffff))
+           (push-u16 buf (logand rel #xffff)))))
     ((eq (first args) 'short)
      (let* ((tgt (resolve labels (second args)))
             (rel (- tgt (+ (cur-addr origin buf) 2))))

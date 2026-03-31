@@ -84,9 +84,9 @@
       (label print-loop)
       (lodsb)
       (test  al al)
-      (jz    load-stage2)
+      (jz-short load-stage2)
       (int   #x10)
-      (jnz   print-loop)
+      (jnz-short print-loop)
 
       ;; Load Stage 2 from floppy into 0x8000
       (label load-stage2)
@@ -99,7 +99,7 @@
       (mov  dl #x00)       ; drive 0 (floppy)
       (mov  bx #x8000)     ; destination: 0x0000:0x8000
       (int  #x13)
-      (jc   disk-error)
+      (jc-short disk-error)
 
       ;; Load kernel (sectors 6-13, 8 sectors = 4KB) into 0x1000:0x0000 = 0x10000
       ;; We can't load to 0x100000 from real mode without A20+unreal mode tricks.
@@ -117,7 +117,7 @@
       (mov  dl #x00)
       (mov  bx #x0000)     ; ES:BX = 0x2000:0x0000 = physical 0x20000
       (int  #x13)
-      (jc   disk-error)    ; carry set = read failed
+      (jc-short disk-error)    ; carry set = read failed
 
       ;; Jump to Stage 2 at 0x8000
       (jmp  abs #x8000)

@@ -24,10 +24,23 @@
   "Register an instruction encoding under MNEMONIC."
   (setf (gethash mnemonic *instruction-table*) (list size-fn emit-fn)))
 
+(defun canonicalize-symbol (sym)
+  "Intern SYM into the ecclesia.build package.
+   Works for both mnemonics and register/operand symbols."
+  (if (symbolp sym)
+      (intern (symbol-name sym) '#:ecclesia.build)
+      sym))
+
 (defun canonicalize-mnemonic (sym)
-  "Intern SYM into the ecclesia.build package so instruction lookups
-   work regardless of which package the instruction form was read in."
-  (intern (symbol-name sym) '#:ecclesia.build))
+  "Intern mnemonic SYM into ecclesia.build."
+  (canonicalize-symbol sym))
+
+(defun canonicalize-form (form)
+  "Recursively canonicalize all symbols in a form."
+  (cond
+    ((symbolp form) (canonicalize-symbol form))
+    ((listp form)   (mapcar #'canonicalize-form form))
+    (t form)))
 
 (defun lookup-instruction (mnemonic)
   (let ((canonical (canonicalize-mnemonic mnemonic)))
@@ -42,7 +55,8 @@
   (cond
     ((integerp expr) expr)
     ((symbolp expr)
-     (or (gethash expr labels)
+     (or (gethash (canonicalize-symbol expr) labels)
+         (gethash expr labels)
          (error "Undefined label in expression: ~a" expr)))
     ((listp expr)
      (let ((op   (first expr))
@@ -63,14 +77,13 @@
 
 (defun instruction-size (form)
   "Return the byte size of FORM without emitting anything."
-  (destructuring-bind (op &rest args) form
-    (let ((op (canonicalize-mnemonic op)))
-      (case op
-        ((org label) 0)
-        (bits (setf *asm-bits* (first args)) 0)
-        (t
-         (let ((entry (lookup-instruction op)))
-           (funcall (first entry) args *asm-bits*)))))))
+  (destructuring-bind (op &rest args) (canonicalize-form form)
+    (case op
+      ((org label) 0)
+      (bits (setf *asm-bits* (first args)) 0)
+      (t
+       (let ((entry (lookup-instruction op)))
+         (funcall (first entry) args *asm-bits*))))))
 
 ;;; ── Label collection (pass 1) ───────────────────────────────────────────────
 
@@ -79,9 +92,9 @@
   (let ((labels    (make-hash-table))
         (offset    0)
         (*asm-bits* 16))
-    (dolist (form instructions)
-      (destructuring-bind (op &rest args) form
-        (let ((op (canonicalize-mnemonic op)))
+    (dolist (raw-form instructions)
+      (let ((form (canonicalize-form raw-form)))
+        (destructuring-bind (op &rest args) form
           (case op
             (org   (setf offset (- (first args) origin)))
             (bits  (setf *asm-bits* (first args)))
@@ -93,22 +106,22 @@
 
 (defun emit-instruction (form labels origin buf)
   "Emit bytes for FORM into BUF."
-  (destructuring-bind (op &rest args) form
-    (let ((op (canonicalize-mnemonic op)))
-      (case op
-        (bits  (setf *asm-bits* (first args)))
-        ((org label) nil)
-        (t
-         (let ((entry (lookup-instruction op)))
-           (funcall (second entry) args labels origin buf *asm-bits*)))))))
+  (destructuring-bind (op &rest args) (canonicalize-form form)
+    (case op
+      (bits  (setf *asm-bits* (first args)))
+      ((org label) nil)
+      (t
+       (let ((entry (lookup-instruction op)))
+         (funcall (second entry) args labels origin buf *asm-bits*))))))
 
 ;;; ── Public API ──────────────────────────────────────────────────────────────
 
 (defun assemble (instructions)
   "Two-pass assemble INSTRUCTIONS into a (unsigned-byte 8) vector."
   (let* ((origin (or (loop for form in instructions
-                           when (eq (car form) 'org)
-                           return (cadr form))
+                           for cform = (canonicalize-form form)
+                           when (eq (car cform) 'org)
+                           return (cadr cform))
                      0))
          (labels     (collect-labels instructions origin))
          (*asm-bits* 16)

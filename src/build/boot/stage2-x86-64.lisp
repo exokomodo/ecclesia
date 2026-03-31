@@ -5,9 +5,11 @@
 ;;;;   2. Write identity-mapped page tables into 0x1000–0x3FFF (16MB)
 ;;;;   3. Enable PAE, load CR3, set EFER.LME, enable paging
 ;;;;   4. Far jump to 64-bit code segment
-;;;;   5. Print [  OK  ] status lines via vga-print.lisp helpers
+;;;;   5. Print [  OK  ] status lines via vga.lisp helpers
 
 (in-package #:ecclesia.build)
+
+
 
 ;;; Stage 2 is loaded from floppy sectors 2-9 (8 sectors = 4KB max)
 (defconstant +floppy-sector-size+ 512)
@@ -42,7 +44,17 @@
 
 (defun long-mode-entry-forms ()
   "Enable PAE, load CR3, set EFER.LME, enable paging, then far jump to 64-bit."
-  `(;; Enable PAE (CR4 bit 5)
+  `(;; ── Copy kernel from 0x20000 → 0x100000 (in 32-bit PM, full addressing) ──
+    ;; Stage 1 loaded 8 sectors (4096 bytes) at physical 0x20000.
+    (mov  esi #x20000)
+    (mov  edi #x100000)
+    (mov  ecx #x400)        ; 4096 / 4 = 1024 dwords
+    (rep  movsd)
+
+    ;; Checkpoint K: kernel copied (cyan 'K' at col 5, row 0)
+    (mov  (mem32 #xb800a) #x0b4b)
+
+    ;; Enable PAE (CR4 bit 5)
     (mov  eax cr4)
     (or   eax #x20)
     (mov  cr4 eax)
@@ -139,8 +151,8 @@
     ;; Row 4: long mode confirmed
     ,@(vga-rdi-status "Entered 64-bit long mode" :row 4)
 
-    ;; Halt
-    (hlt)))
+    ;; Jump to kernel at 0x100000
+    (jmp abs #x100000)))
 
 (defun stage2-size ()
   (length (assemble *stage2*)))

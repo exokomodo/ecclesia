@@ -24,11 +24,24 @@
     (assert= t (<= (length img) (* 8 +floppy-sector-size+))
              "Kernel64 fits within 8 sectors (4096 bytes)")
 
-    ;; Stub: just verify it assembles and halts
-    (let ((hlt-pos (loop for i from 0 below (length img)
-                         when (= (aref img i) #xf4) return i)))
-      (assert= t (not (null hlt-pos))
-               "Kernel64 stub contains HLT (0xF4)")))
+    ;; REX.W prefix (0x48) should appear (MOV RSP, imm64)
+    (assert= #x48 (aref img 0)
+             "Kernel64 first byte is REX.W prefix (MOV RSP)")
+
+    ;; IN AL opcode (0xE4) should appear (PS/2 keyboard polling)
+    (let ((in-pos (loop for i from 0 below (length img)
+                        when (= (aref img i) #xe4) return i)))
+      (assert= t (not (null in-pos))
+               "Kernel64 contains IN AL (0xE4) for keyboard polling"))
+
+    ;; Scancode table should be present (contains ASCII 113='q' at index 0x10)
+    ;; 113 = 0x71
+    (let ((q-pos (loop for i from 0 below (- (length img) 1)
+                       when (and (= (aref img i) 113)     ; 'q'
+                                 (= (aref img (1+ i)) 119)) ; 'w' follows
+                       return i)))
+      (assert= t (not (null q-pos))
+               "Kernel64 contains scancode→ASCII table (q/w at consecutive offsets)")))
 
   (format t "~%All kernel64 tests passed.~%"))
 

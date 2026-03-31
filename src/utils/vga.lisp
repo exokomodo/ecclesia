@@ -1,4 +1,4 @@
-;;;; vga-print.lisp — VGA text buffer helpers
+;;;; vga.lisp — VGA text buffer helpers
 ;;;;
 ;;;; Two addressing flavours:
 ;;;;   vga-*        — absolute writes via (mem32 addr), safe in 16/32-bit mode
@@ -11,18 +11,18 @@
 ;;;;   #x0a  bright green        #x0c  bright red
 ;;;;   #x0e  yellow              #x08  dark grey
 
-(in-package #:ecclesia.build)
+(in-package #:ecclesia.utils)
 
 (defconstant +vga-base+ #xb8000)
 (defconstant +vga-cols+ 80)
 
 ;;; ── Shared primitives ───────────────────────────────────────────────────────
 
-(defun vga-addr (row col)
+(defun vga-addr (row col &key (width +vga-cols+))
   "Absolute VGA memory address for cell (ROW, COL)."
   (+ +vga-base+ (* 2 (+ (* row +vga-cols+) col))))
 
-(defun vga-offset (row col)
+(defun vga-offset (row col &key (width +vga-cols+))
   "Byte offset from +vga-base+ for cell (ROW, COL)."
   (* 2 (+ (* row +vga-cols+) col)))
 

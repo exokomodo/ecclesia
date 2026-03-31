@@ -1,3 +1,160 @@
-;;;; main.lisp — 64-bit kernel entry point (stub, not yet reached)
+;;;; main.lisp — 64-bit kernel entry point
+;;;;
+;;;; MVP: poll PS/2 keyboard, translate scancode→ASCII via embedded lookup table,
+;;;; write characters to VGA at a tracked cursor position.
+
 (in-package #:ecclesia)
-(defparameter *kernel64* '((bits 16) (org #x100000) (hlt)))
+
+(defparameter *prompt-str* "ecclesia> ")
+(defparameter *prompt-row* 23)
+
+;;; US QWERTY scancode set 1 → ASCII, unshifted (89 entries: 0x00–0x58)
+(defparameter *scancode-ascii*
+  #(  0  27  49  50  51  52  53  54  55  56  57  48  45  61   8   9
+    113 119 101 114 116 121 117 105 111 112  91  93  13   0  97 115
+    100 102 103 104 106 107 108  59  39  96   0  92 122 120  99 118
+     98 110 109  44  46  47   0   0   0  32   0   0   0   0   0   0
+      0   0   0   0   0   0   0   0   0   0   0   0   0   0   0   0
+      0   0   0   0   0   0   0   0   0))
+
+(defun scancode-db-forms ()
+  (loop for c across *scancode-ascii* collect `(db ,c)))
+
+(defparameter *kernel64*
+  `(;; ===== 64-bit kernel entry =====
+    (bits 64)
+    (org  #x100000)
+
+    (mov  rsp #x200000)
+    (mov  rdi #xb8000)
+
+    ;; Print prompt
+    ,@(vga-rdi-write *prompt-str* :row *prompt-row* :col 0 :attr #x0a)
+
+    ;; Jump over embedded data
+    (jmp abs kbd-main-loop)
+
+    ;; ── Embedded data ──────────────────────────────────────────────────────
+    (label kbd-ascii-table)
+    ,@(scancode-db-forms)
+
+    (label kbd-cursor-col)  (db ,(length *prompt-str*))
+    (label kbd-cursor-row)  (db ,*prompt-row*)
+
+    ;; ── Main keyboard loop ───────────────────────────────────────────────────
+    (label kbd-main-loop)
+    (mov  rdi #xb8000)
+
+    ;; Poll PS/2 port 0x64
+    (label kbd-poll)
+    (in   al #x64)
+    (test al #x01)
+    (jz   kbd-poll)
+
+    ;; Read scancode
+    (in   al #x60)
+
+    ;; Skip key releases (bit 7 set)
+    (test al #x80)
+    (jnz  kbd-main-loop)
+
+    ;; Skip scancodes >= 0x59
+    (cmp8 al #x59)
+    (jnc  kbd-main-loop)
+
+    ;; Translate scancode -> ASCII
+    (movzx eax al)
+    (mov   rbx kbd-ascii-table)
+    (add   rbx rax)
+    (byte-load-al-rbx)
+
+    ;; Skip unmapped (ASCII = 0)
+    (test  al al)
+    (jz    kbd-main-loop)
+
+    ;; ── Backspace (ASCII 8) ──────────────────────────────────────────────────
+    (cmp8  al #x08)
+    (jz    kbd-backspace)
+    (jmp   abs kbd-printable)
+
+    (label kbd-backspace)
+    ;; If off-screen (row >= 25), back up to row 24 col 79
+    (mov   rbx kbd-cursor-row)
+    (byte-loadsx-edx-rbx)
+    (mov   eax edx)
+    (cmp8  al #x19)                    ; row >= 25?
+    (jc    kbd-bs-on-screen)           ; no — normal backspace
+
+    ;; Off-screen: move cursor to row 24 col 79
+    (store-byte-rbx 24)                ; row = 24
+    (mov   rbx kbd-cursor-col)
+    (store-byte-rbx ,(1- +vga-cols+))  ; col = 79
+    (jmp   abs kbd-bs-erase)
+
+    (label kbd-bs-on-screen)
+    ;; Don't erase past the prompt
+    (mov   rbx kbd-cursor-col)
+    (byte-loadsx-ecx-rbx)
+    (cmp8  cl ,(length *prompt-str*))
+    (jbe   kbd-main-loop)              ; col <= prompt length — ignore
+    ;; Decrement col
+    (dec-byte-rbx)
+
+    (label kbd-bs-erase)
+    ;; Compute VGA offset and write space
+    (mov   rbx kbd-cursor-col)
+    (byte-loadsx-ecx-rbx)              ; ECX = col
+    (mov   rbx kbd-cursor-row)
+    (byte-loadsx-edx-rbx)              ; EDX = row
+    (imul  edx ,(* 2 +vga-cols+))
+    (imul  ecx #x02)
+    (add   edx ecx)
+    (mov   rdi ,+vga-base+)
+    (store-rdi-edx-byte 0 #x20)
+    (store-rdi-edx-byte 1 #x0f)
+    (jmp   abs kbd-main-loop)
+
+    ;; ── Printable char ───────────────────────────────────────────────────────
+    (label kbd-printable)
+    ;; Save char — row check clobbers AL
+    (push-reg rax)
+
+    ;; Reject if screen full (row >= 25)
+    (mov   rbx kbd-cursor-row)
+    (byte-loadsx-edx-rbx)
+    (mov   eax edx)
+    (cmp8  al #x19)
+    (jnc   kbd-full)
+
+    ;; Load col, compute VGA offset
+    (mov   rbx kbd-cursor-col)
+    (byte-loadsx-ecx-rbx)
+    (imul  edx ,(* 2 +vga-cols+))
+    (imul  ecx #x02)
+    (add   edx ecx)
+
+    ;; Restore char, write to VGA
+    (pop-reg rax)
+    (mov   rdi ,+vga-base+)
+    (store-rdi-edx-al 0)
+    (store-rdi-edx-byte 1 #x0f)
+
+    ;; Advance cursor col
+    (mov   rbx kbd-cursor-col)
+    (inc-byte-rbx)
+    (byte-loadsx-ecx-rbx)
+    (cmp8  cl ,+vga-cols+)
+    (jc    kbd-no-wrap)
+
+    ;; Col overflow: wrap to col 0, advance row
+    (store-zero-rbx)
+    (mov   rbx kbd-cursor-row)
+    (inc-byte-rbx)
+
+    (label kbd-no-wrap)
+    (jmp   abs kbd-main-loop)
+
+    ;; Screen full — pop saved char and loop (ignore input)
+    (label kbd-full)
+    (pop-reg rax)
+    (jmp   abs kbd-main-loop)))

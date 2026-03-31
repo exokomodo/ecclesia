@@ -36,11 +36,11 @@
       (assert= t (not (null lgdt-pos))
                "Stage 2 contains LGDT (0x0F 0x01)"))
 
-    ;; HLT (0xF4) present
-    (let ((hlt-pos (loop for i from 0 below (length img)
-                         when (= (aref img i) #xf4) return i)))
-      (assert= t (not (null hlt-pos))
-               "Stage 2 contains HLT (0xF4)")))
+    ;; JMP (0xE9) present — Stage 2 jumps to kernel at 0x100000
+    (let ((jmp-pos (loop for i from 0 below (length img)
+                         when (= (aref img i) #xe9) return i)))
+      (assert= t (not (null jmp-pos))
+               "Stage 2 contains JMP to kernel (0xE9)")))
 
   (format t "~%All Stage 2 tests passed.~%"))
 

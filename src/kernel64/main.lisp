@@ -108,7 +108,22 @@
     ;; Move char from BL → AL for store-rdi-edx-al
     (mov   al bl)
 
-    ;; Write char and attr to [RDI + EDX + 0] and [RDI + EDX + 1]
+    ;; Debug: also write at a known good position (row 7 col 0) so we
+    ;; can see what char is being written at all
+    (mov   edx #x460)     ; row 7 col 0 = (7*80)*2 = 1120 = 0x460
+    (store-rdi-edx-al 0)
+    (store-rdi-edx-byte 1 #x0f)
+
+    ;; Now write at the actual cursor position
+    (mov   rbx kbd-cursor-col)
+    (byte-loadsx-ecx-rbx)
+    (mov   rbx kbd-cursor-row)
+    (byte-loadsx-edx-rbx)
+    (imul  edx #x50)
+    (add   edx ecx)
+    (imul  edx #x02)
+    (mov   al bl)
+    ;; Write char and attr
     (store-rdi-edx-al 0)               ; [RDI+EDX] = char
     (store-rdi-edx-byte 1 #x0f)        ; [RDI+EDX+1] = attr (white)
 

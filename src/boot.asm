@@ -2,7 +2,7 @@
 ;
 ; Multiboot2-compliant header. GRUB loads this, sets up a minimal
 ; environment, then hands off to the SBCL bare-metal runtime which
-; in turn loads boot.lisp.
+; in turn loads main.lisp.
 ;
 ; Assemble with: nasm -f elf64 boot.asm -o boot.o
 

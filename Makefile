@@ -9,7 +9,7 @@ UNAME_S := $(shell uname -s)
 
 # Variables
 TARGET_ARCH ?= x86-64
-QEMU        ?= qemu-system-x86_64
+QEMU        ?= qemu-system-$(TARGET_ARCH)
 FLOPPY      ?= ecclesia_$(TARGET_ARCH).img
 WRITER      ?= scripts/write-kernel.lisp
 

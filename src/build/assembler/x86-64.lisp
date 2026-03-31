@@ -299,13 +299,18 @@
 ;;; ── CMP ─────────────────────────────────────────────────────────────────────
 
 ;; (cmp8 al imm8)  →  0x3C imm8
-(definsn cmp8 (args mode) 2
+(definsn cmp8 (args mode)
+         (if (eq (first args) 'al) 2 3)    ; AL=2 bytes, CL=3 bytes
          (args labels origin buf mode)
-  (push-byte buf #x3c)
-  (push-byte buf (logand (second args) #xff)))
-
-;; (cmp8 cl imm8) same opcode family — extend to r8
-;; For now cmp8 only supports AL (most common path)
+  (cond
+    ((eq (first args) 'al)
+     (push-byte buf #x3c)                  ; CMP AL, imm8
+     (push-byte buf (logand (second args) #xff)))
+    ((eq (first args) 'cl)
+     (push-byte buf #x80)                  ; CMP r/m8, imm8
+     (push-byte buf #xf9)                  ; ModRM: mod=11 /7 r/m=CL
+     (push-byte buf (logand (second args) #xff)))
+    (t (error "CMP8 only supports AL or CL, got ~a" (first args)))))
 
 ;;; ── JNB / JAE (jump if not below = jump if carry clear) ────────────────────
 ;; Already have jnc = 0x73. Also add jge (same as jnl, 0x7D):

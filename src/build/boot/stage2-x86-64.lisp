@@ -149,8 +149,8 @@
     ;; Row 4: long mode confirmed
     ,@(vga-rdi-status "Entered 64-bit long mode" :row 4)
 
-    ;; Halt
-    (hlt)))
+    ;; Jump to kernel at 0x100000
+    (jmp abs #x100000)))
 
 (defun stage2-size ()
   (length (assemble *stage2*)))

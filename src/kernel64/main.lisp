@@ -6,7 +6,7 @@
 (in-package #:ecclesia)
 
 (defparameter *prompt-str* "ecclesia> ")
-(defparameter *prompt-row* 6)
+(defparameter *prompt-row* 23)
 
 ;;; US QWERTY scancode set 1 → ASCII, unshifted (89 entries: 0x00–0x58)
 (defparameter *scancode-ascii*
@@ -58,11 +58,11 @@
     (test al #x80)
     (jnz  kbd-main-loop)
 
-    ;; Skip scancodes ≥ 0x59
+    ;; Skip scancodes >= 0x59
     (cmp8 al #x59)
     (jnc  kbd-main-loop)
 
-    ;; Translate scancode → ASCII
+    ;; Translate scancode -> ASCII
     (movzx eax al)
     (mov   rbx kbd-ascii-table)
     (add   rbx rax)
@@ -72,129 +72,72 @@
     (test  al al)
     (jz    kbd-main-loop)
 
-    ;; ── Handle backspace (ASCII 8) ───────────────────────────────────────────
+    ;; ── Backspace (ASCII 8) ──────────────────────────────────────────────────
     (cmp8  al #x08)
     (jz    kbd-backspace)
     (jmp   abs kbd-printable)
 
     (label kbd-backspace)
-
-    ;; Backspace: check if col > 0 first
-    (mov   rbx kbd-cursor-col)
-    (byte-loadsx-ecx-rbx)              ; ECX = current col
-    (test  cl cl)
-    (jnz   kbd-bs-same-row)
-
-    ;; Col is 0 — need to go back to previous row
-    (mov   rbx kbd-cursor-row)
-    (byte-loadsx-edx-rbx)              ; EDX = current row
-    (cmp8  cl ,*prompt-row*)           ; on prompt row? (CL=0 here, but check row)
-    ;; Actually check row: if row <= prompt-row AND col <= prompt-len, reject
-    ;; For now: if row == prompt-row, col is already 0, reject
-    ;; (can't backspace past start of prompt row)
-
-    ;; Compare row to prompt row — need to use DL not CL
-    ;; DL holds row from byte-loadsx-edx-rbx... but cmp8 only does AL/CL.
-    ;; Workaround: copy EDX to EAX, compare AL
-    (mov   eax edx)
-    (cmp8  al ,*prompt-row*)
-    (jbe   kbd-main-loop)              ; row <= prompt row with col 0 — ignore
-
-    ;; Go to end of previous row
-    (mov   rbx kbd-cursor-row)
-    (dec-byte-rbx)
-    (mov   rbx kbd-cursor-col)
-    (store-byte-rbx ,(1- +vga-cols+))  ; col = 79
-
-    ;; Erase char at new position (previous row, col 79)
-    (mov   rbx kbd-cursor-row)
-    (byte-loadsx-edx-rbx)
-    (imul  edx ,(* 2 +vga-cols+))
-    (mov   ecx ,(* 2 (1- +vga-cols+))) ; col 79 * 2
-    (add   edx ecx)
-    (mov   rdi ,+vga-base+)
-    (store-rdi-edx-byte 0 #x20)
-    (store-rdi-edx-byte 1 #x0f)
-    (jmp   abs kbd-main-loop)
-
-    (label kbd-bs-same-row)
-    ;; Check prompt clamp (only on prompt row)
-    (mov   rbx kbd-cursor-row)
-    (byte-loadsx-edx-rbx)
-    (mov   eax edx)
-    (cmp8  al ,*prompt-row*)
-    (jnz   kbd-bs-do-it)               ; not prompt row — no clamp
-
-    ;; On prompt row: check col <= prompt length
+    ;; Don't erase past the prompt
     (mov   rbx kbd-cursor-col)
     (byte-loadsx-ecx-rbx)
     (cmp8  cl ,(length *prompt-str*))
-    (jbe   kbd-main-loop)              ; at/before prompt — ignore
+    (jbe   kbd-main-loop)              ; col <= prompt length — ignore
 
-    (label kbd-bs-do-it)
-    (mov   rbx kbd-cursor-col)
+    ;; Decrement col, compute offset, write space
     (dec-byte-rbx)
-
-    ;; Compute VGA offset for the cell we just backed into
-    (byte-loadsx-ecx-rbx)              ; ECX = new col (after dec)
+    (byte-loadsx-ecx-rbx)              ; ECX = new col
     (mov   rbx kbd-cursor-row)
     (byte-loadsx-edx-rbx)              ; EDX = row
     (imul  edx ,(* 2 +vga-cols+))
     (imul  ecx #x02)
     (add   edx ecx)
-
-    ;; Write space to erase
     (mov   rdi ,+vga-base+)
     (store-rdi-edx-byte 0 #x20)
     (store-rdi-edx-byte 1 #x0f)
-
     (jmp   abs kbd-main-loop)
 
-    ;; ── Printable char ──────────────────────────────────────────────────────
+    ;; ── Printable char ───────────────────────────────────────────────────────
     (label kbd-printable)
-    ;; Save char before we clobber AL for the row check
+    ;; Save char — row check clobbers AL
     (push-reg rax)
 
     ;; Reject if screen full (row >= 25)
     (mov   rbx kbd-cursor-row)
     (byte-loadsx-edx-rbx)
     (mov   eax edx)
-    (cmp8  al #x19)                    ; row >= 25?
-    (jc    kbd-do-print)               ; row < 25 — proceed
+    (cmp8  al #x19)
+    (jnc   kbd-full)
 
-    ;; Screen full — discard char and loop
-    (pop-reg rax)
-    (jmp   abs kbd-main-loop)
-
-    (label kbd-do-print)
-    ;; Load cursor col
+    ;; Load col, compute VGA offset
     (mov   rbx kbd-cursor-col)
-    (byte-loadsx-ecx-rbx)              ; ECX = col
+    (byte-loadsx-ecx-rbx)
+    (imul  edx ,(* 2 +vga-cols+))
+    (imul  ecx #x02)
+    (add   edx ecx)
 
-    ;; VGA offset = (row * 80 + col) * 2
-    (imul  edx ,(* 2 +vga-cols+))      ; EDX = row * 160
-    (imul  ecx #x02)                   ; ECX = col * 2
-    (add   edx ecx)                    ; EDX = byte offset
-
-    ;; Restore char into AL
+    ;; Restore char, write to VGA
     (pop-reg rax)
-
-    ;; Write char + attr
     (mov   rdi ,+vga-base+)
     (store-rdi-edx-al 0)
     (store-rdi-edx-byte 1 #x0f)
 
-    ;; ── Advance cursor col ───────────────────────────────────────────────────
+    ;; Advance cursor col
     (mov   rbx kbd-cursor-col)
     (inc-byte-rbx)
-    (byte-loadsx-ecx-rbx)              ; ECX = new col
-    (cmp8  cl ,+vga-cols+)             ; col >= 80?
-    (jc    kbd-no-wrap)                ; no — skip wrap
+    (byte-loadsx-ecx-rbx)
+    (cmp8  cl ,+vga-cols+)
+    (jc    kbd-no-wrap)
 
-    ;; Col overflow: wrap to col 0, advance row (let it go to 25)
-    (store-zero-rbx)                   ; col = 0
+    ;; Col overflow: wrap to col 0, advance row
+    (store-zero-rbx)
     (mov   rbx kbd-cursor-row)
     (inc-byte-rbx)
 
     (label kbd-no-wrap)
+    (jmp   abs kbd-main-loop)
+
+    ;; Screen full — pop saved char and loop (ignore input)
+    (label kbd-full)
+    (pop-reg rax)
     (jmp   abs kbd-main-loop)))

@@ -9,7 +9,17 @@ on:
 
 jobs:
   ci:
+    name: CI [${{ matrix.target-arch }}]
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        target-arch:
+          - x86-64
+
+    env:
+      TARGET_ARCH: ${{ matrix.target-arch }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -18,16 +28,15 @@ jobs:
         run: |
           make setup/sbcl
 
-      - name: Build
+      - name: Build [${{ matrix.target-arch }}]
         run: |
           make build
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: floppy-image
-          path: floppy.img
-
+          name: ecclesia-${{ matrix.target-arch }}
+          path: ecclesia-${{ matrix.target-arch }}.img
 
       - name: Unit Tests
         run: |

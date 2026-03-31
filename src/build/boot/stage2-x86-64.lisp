@@ -7,7 +7,7 @@
 ;;;;   4. Far jump to 64-bit code segment
 ;;;;   5. Print [  OK  ] status lines via vga-print.lisp helpers
 
-(in-package #:ecclesia)
+(in-package #:ecclesia.build)
 
 ;;; Stage 2 is loaded from floppy sectors 2-9 (8 sectors = 4KB max)
 (defconstant +floppy-sector-size+ 512)

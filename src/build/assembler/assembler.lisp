@@ -13,7 +13,7 @@
 ;;;;
 ;;;; To add new instruction sets, call register-instruction for each mnemonic.
 
-(in-package #:ecclesia)
+(in-package #:ecclesia.build)
 
 ;;; ── Instruction table ───────────────────────────────────────────────────────
 
@@ -24,9 +24,15 @@
   "Register an instruction encoding under MNEMONIC."
   (setf (gethash mnemonic *instruction-table*) (list size-fn emit-fn)))
 
+(defun canonicalize-mnemonic (sym)
+  "Intern SYM into the ecclesia.build package so instruction lookups
+   work regardless of which package the instruction form was read in."
+  (intern (symbol-name sym) '#:ecclesia.build))
+
 (defun lookup-instruction (mnemonic)
-  (or (gethash mnemonic *instruction-table*)
-      (error "Unknown instruction: ~a" mnemonic)))
+  (let ((canonical (canonicalize-mnemonic mnemonic)))
+    (or (gethash canonical *instruction-table*)
+        (error "Unknown instruction: ~a" mnemonic))))
 
 ;;; ── Expression evaluator ────────────────────────────────────────────────────
 
@@ -58,12 +64,13 @@
 (defun instruction-size (form)
   "Return the byte size of FORM without emitting anything."
   (destructuring-bind (op &rest args) form
-    (case op
-      ((org label) 0)
-      (bits (setf *asm-bits* (first args)) 0)
-      (t
-       (let ((entry (lookup-instruction op)))
-         (funcall (first entry) args *asm-bits*))))))
+    (let ((op (canonicalize-mnemonic op)))
+      (case op
+        ((org label) 0)
+        (bits (setf *asm-bits* (first args)) 0)
+        (t
+         (let ((entry (lookup-instruction op)))
+           (funcall (first entry) args *asm-bits*)))))))
 
 ;;; ── Label collection (pass 1) ───────────────────────────────────────────────
 
@@ -74,11 +81,12 @@
         (*asm-bits* 16))
     (dolist (form instructions)
       (destructuring-bind (op &rest args) form
-        (case op
-          (org   (setf offset (- (first args) origin)))
-          (bits  (setf *asm-bits* (first args)))
-          (label (setf (gethash (first args) labels) (+ origin offset)))
-          (t     (incf offset (instruction-size form))))))
+        (let ((op (canonicalize-mnemonic op)))
+          (case op
+            (org   (setf offset (- (first args) origin)))
+            (bits  (setf *asm-bits* (first args)))
+            (label (setf (gethash (first args) labels) (+ origin offset)))
+            (t     (incf offset (instruction-size form)))))))
     labels))
 
 ;;; ── Byte emission (pass 2) ──────────────────────────────────────────────────
@@ -86,12 +94,13 @@
 (defun emit-instruction (form labels origin buf)
   "Emit bytes for FORM into BUF."
   (destructuring-bind (op &rest args) form
-    (case op
-      (bits  (setf *asm-bits* (first args)))
-      ((org label) nil)
-      (t
-       (let ((entry (lookup-instruction op)))
-         (funcall (second entry) args labels origin buf *asm-bits*))))))
+    (let ((op (canonicalize-mnemonic op)))
+      (case op
+        (bits  (setf *asm-bits* (first args)))
+        ((org label) nil)
+        (t
+         (let ((entry (lookup-instruction op)))
+           (funcall (second entry) args labels origin buf *asm-bits*)))))))
 
 ;;; ── Public API ──────────────────────────────────────────────────────────────
 

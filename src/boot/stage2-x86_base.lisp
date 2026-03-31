@@ -1,4 +1,4 @@
-;;;; stage2-common.lisp — Shared Stage 2 code for all x86 targets
+;;;; stage2-x86_base.lisp — Shared Stage 2 code for all x86 targets
 ;;;;
 ;;;; These functions emit the boot steps that are identical regardless
 ;;;; of whether the final target is 32-bit or 64-bit.

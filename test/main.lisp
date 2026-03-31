@@ -1,4 +1,4 @@
-;;;; test/kernel64.lisp — 64-bit kernel unit tests
+;;;; test/main.lisp — 64-bit kernel unit tests
 
 (defpackage #:ecclesia-test-kernel64
   (:use #:cl #:ecclesia #:ecclesia.build))

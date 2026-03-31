@@ -280,9 +280,19 @@
   (push-u32 buf (first args))
   (push-u16 buf (second args)))
 
-;;; ── Conditional short jumps ──────────────────────────────────────────────────
+;;; ── Conditional jumps (always near = 6 bytes) ──────────────────────────────
+;;; Use (jz-short label) for the 2-byte short form in tight code (Stage 1).
 
-(macrolet ((cjmp (mnem opcode)
+(macrolet ((cjmp-near (mnem short-op)
+             (let ((near-op (+ short-op #x10)))
+               `(definsn ,mnem (args mode) 6
+                         (args labels origin buf mode)
+                  (let* ((tgt (resolve labels (first args)))
+                         (rel (- tgt (+ (cur-addr origin buf) 6))))
+                    (push-byte buf #x0f)
+                    (push-byte buf ,near-op)
+                    (push-u32  buf (logand rel #xffffffff))))))
+           (cjmp-short (mnem opcode)
              `(definsn ,mnem (args mode) 2
                        (args labels origin buf mode)
                 (let* ((tgt (resolve labels (first args)))
@@ -291,10 +301,15 @@
                     (error "~a out of range to ~a (rel=~d)" ',mnem (first args) rel))
                   (push-byte buf ,opcode)
                   (push-byte buf (logand rel #xff))))))
-  (cjmp jz  #x74)
-  (cjmp jnz #x75)
-  (cjmp jc  #x72)
-  (cjmp jnc #x73))
+  (cjmp-near jz   #x74)
+  (cjmp-near jnz  #x75)
+  (cjmp-near jc   #x72)
+  (cjmp-near jnc  #x73)
+  ;; Short variants for size-constrained code
+  (cjmp-short jz-short  #x74)
+  (cjmp-short jnz-short #x75)
+  (cjmp-short jc-short  #x72)
+  (cjmp-short jnc-short #x73))
 
 ;;; ── CMP ─────────────────────────────────────────────────────────────────────
 
@@ -313,20 +328,20 @@
     (t (error "CMP8 only supports AL or CL, got ~a" (first args)))))
 
 ;;; ── JNB / JAE (jump if not below = jump if carry clear) ────────────────────
-;; Already have jnc = 0x73. Also add jge (same as jnl, 0x7D):
-(macrolet ((cjmp (mnem opcode)
-             `(definsn ,mnem (args mode) 2
-                       (args labels origin buf mode)
-                (let* ((tgt (resolve labels (first args)))
-                       (rel (- tgt (+ (cur-addr origin buf) 2))))
-                  (unless (<= -128 rel 127)
-                    (error "~a out of range to ~a" ',mnem (first args)))
-                  (push-byte buf ,opcode)
-                  (push-byte buf (logand rel #xff))))))
-  (cjmp jge  #x7d)    ; jump if >=  (signed)
-  (cjmp jle  #x7e)    ; jump if <=
-  (cjmp ja   #x77)    ; jump if above (unsigned)
-  (cjmp jbe  #x76))   ; jump if below or equal
+;; Additional conditional jumps (always near).
+(macrolet ((cjmp-near (mnem short-op)
+             (let ((near-op (+ short-op #x10)))
+               `(definsn ,mnem (args mode) 6
+                         (args labels origin buf mode)
+                  (let* ((tgt (resolve labels (first args)))
+                         (rel (- tgt (+ (cur-addr origin buf) 6))))
+                    (push-byte buf #x0f)
+                    (push-byte buf ,near-op)
+                    (push-u32  buf (logand rel #xffffffff)))))))
+  (cjmp-near jge  #x7d)    ; jump if >=  (signed)
+  (cjmp-near jle  #x7e)    ; jump if <=
+  (cjmp-near ja   #x77)    ; jump if above (unsigned)
+  (cjmp-near jbe  #x76))   ; jump if below or equal
 
 ;;; ── MOVZX ───────────────────────────────────────────────────────────────────
 

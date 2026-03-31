@@ -74,39 +74,100 @@
 
     ;; ── Handle backspace (ASCII 8) ───────────────────────────────────────────
     (cmp8  al #x08)
-    (jnz   kbd-printable)
+    (jz    kbd-backspace)
+    (jmp   abs kbd-printable)
 
-    ;; Backspace: don't go past the prompt
+    (label kbd-backspace)
+
+    ;; Backspace: check if col > 0 first
     (mov   rbx kbd-cursor-col)
     (byte-loadsx-ecx-rbx)              ; ECX = current col
-    (cmp8  cl ,(length *prompt-str*))
-    (jbe   kbd-main-loop)              ; col <= prompt length — ignore
+    (test  cl cl)
+    (jnz   kbd-bs-same-row)
 
-    ;; Decrement cursor col
+    ;; Col is 0 — need to go back to previous row
+    (mov   rbx kbd-cursor-row)
+    (byte-loadsx-edx-rbx)              ; EDX = current row
+    (cmp8  cl ,*prompt-row*)           ; on prompt row? (CL=0 here, but check row)
+    ;; Actually check row: if row <= prompt-row AND col <= prompt-len, reject
+    ;; For now: if row == prompt-row, col is already 0, reject
+    ;; (can't backspace past start of prompt row)
+
+    ;; Compare row to prompt row — need to use DL not CL
+    ;; DL holds row from byte-loadsx-edx-rbx... but cmp8 only does AL/CL.
+    ;; Workaround: copy EDX to EAX, compare AL
+    (mov   eax edx)
+    (cmp8  al ,*prompt-row*)
+    (jbe   kbd-main-loop)              ; row <= prompt row with col 0 — ignore
+
+    ;; Go to end of previous row
+    (mov   rbx kbd-cursor-row)
+    (dec-byte-rbx)
+    (mov   rbx kbd-cursor-col)
+    (store-byte-rbx ,(1- +vga-cols+))  ; col = 79
+
+    ;; Erase char at new position (previous row, col 79)
+    (mov   rbx kbd-cursor-row)
+    (byte-loadsx-edx-rbx)
+    (imul  edx ,(* 2 +vga-cols+))
+    (mov   ecx ,(* 2 (1- +vga-cols+))) ; col 79 * 2
+    (add   edx ecx)
+    (mov   rdi ,+vga-base+)
+    (store-rdi-edx-byte 0 #x20)
+    (store-rdi-edx-byte 1 #x0f)
+    (jmp   abs kbd-main-loop)
+
+    (label kbd-bs-same-row)
+    ;; Check prompt clamp (only on prompt row)
+    (mov   rbx kbd-cursor-row)
+    (byte-loadsx-edx-rbx)
+    (mov   eax edx)
+    (cmp8  al ,*prompt-row*)
+    (jnz   kbd-bs-do-it)               ; not prompt row — no clamp
+
+    ;; On prompt row: check col <= prompt length
+    (mov   rbx kbd-cursor-col)
+    (byte-loadsx-ecx-rbx)
+    (cmp8  cl ,(length *prompt-str*))
+    (jbe   kbd-main-loop)              ; at/before prompt — ignore
+
+    (label kbd-bs-do-it)
+    (mov   rbx kbd-cursor-col)
     (dec-byte-rbx)
 
     ;; Compute VGA offset for the cell we just backed into
     (byte-loadsx-ecx-rbx)              ; ECX = new col (after dec)
     (mov   rbx kbd-cursor-row)
     (byte-loadsx-edx-rbx)              ; EDX = row
-    (imul  edx ,(* 2 +vga-cols+))      ; EDX = row * 160
-    (imul  ecx #x02)                   ; ECX = col * 2
-    (add   edx ecx)                    ; EDX = byte offset
+    (imul  edx ,(* 2 +vga-cols+))
+    (imul  ecx #x02)
+    (add   edx ecx)
 
-    ;; Write space to erase the character
+    ;; Write space to erase
     (mov   rdi ,+vga-base+)
-    (store-rdi-edx-byte 0 #x20)        ; space
-    (store-rdi-edx-byte 1 #x0f)        ; white on black
+    (store-rdi-edx-byte 0 #x20)
+    (store-rdi-edx-byte 1 #x0f)
 
     (jmp   abs kbd-main-loop)
 
-    ;; ── Printable char: write at cursor position ─────────────────────────────
+    ;; ── Printable char ──────────────────────────────────────────────────────
     (label kbd-printable)
+    ;; Save char before we clobber AL for the row check
     (push-reg rax)
 
-    ;; Load cursor row → EDX, cursor col → ECX
+    ;; Reject if screen full (row >= 25)
     (mov   rbx kbd-cursor-row)
-    (byte-loadsx-edx-rbx)              ; EDX = row
+    (byte-loadsx-edx-rbx)
+    (mov   eax edx)
+    (cmp8  al #x19)                    ; row >= 25?
+    (jc    kbd-do-print)               ; row < 25 — proceed
+
+    ;; Screen full — discard char and loop
+    (pop-reg rax)
+    (jmp   abs kbd-main-loop)
+
+    (label kbd-do-print)
+    ;; Load cursor col
     (mov   rbx kbd-cursor-col)
     (byte-loadsx-ecx-rbx)              ; ECX = col
 
@@ -130,20 +191,10 @@
     (cmp8  cl ,+vga-cols+)             ; col >= 80?
     (jc    kbd-no-wrap)                ; no — skip wrap
 
-    ;; Col overflow: wrap to col 0, advance row
+    ;; Col overflow: wrap to col 0, advance row (let it go to 25)
     (store-zero-rbx)                   ; col = 0
     (mov   rbx kbd-cursor-row)
     (inc-byte-rbx)
-
-    ;; Check if row >= 25 — screen full, reject the char
-    (byte-loadsx-ecx-rbx)              ; ECX = new row
-    (cmp8  cl #x19)                    ; row >= 25?
-    (jc    kbd-no-wrap)                ; no — continue
-
-    ;; Screen full: undo row increment, pin cursor at end of last row
-    (dec-byte-rbx)                     ; row back to 24
-    (mov   rbx kbd-cursor-col)
-    (store-byte-rbx ,(1- +vga-cols+))  ; col = 79 (last valid column)
 
     (label kbd-no-wrap)
     (jmp   abs kbd-main-loop)))

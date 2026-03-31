@@ -42,7 +42,14 @@
 
 (defun long-mode-entry-forms ()
   "Enable PAE, load CR3, set EFER.LME, enable paging, then far jump to 64-bit."
-  `(;; Enable PAE (CR4 bit 5)
+  `(;; ── Copy kernel from 0x20000 → 0x100000 (in 32-bit PM, full addressing) ──
+    ;; Stage 1 loaded 8 sectors (4096 bytes) at physical 0x20000.
+    (mov  esi #x20000)
+    (mov  edi #x100000)
+    (mov  ecx #x400)        ; 4096 / 4 = 1024 dwords
+    (rep  movsd)
+
+    ;; Enable PAE (CR4 bit 5)
     (mov  eax cr4)
     (or   eax #x20)
     (mov  cr4 eax)

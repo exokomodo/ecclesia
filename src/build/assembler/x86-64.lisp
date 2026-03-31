@@ -152,10 +152,20 @@
 
 ;;; ── TEST ────────────────────────────────────────────────────────────────────
 
-(definsn test (args mode) 2
+(definsn test (args mode)
+         (cond ((and (eq (first args) 'al) (numberp (second args))) 2)  ; TEST AL, imm8
+               (t 2))  ; TEST r8, r8
          (args labels origin buf mode)
-  (push-byte buf #x84)
-  (push-byte buf #xc0))  ; AL, AL only for now
+  (let ((dst (first args)) (src (second args)))
+    (cond
+      ;; TEST AL, imm8  →  0xA8 imm8
+      ((and (eq dst 'al) (numberp src))
+       (push-byte buf #xa8)
+       (push-byte buf (logand src #xff)))
+      ;; TEST r8, r8  →  0x84 /r
+      (t
+       (push-byte buf #x84)
+       (push-byte buf #xc0)))))
 
 ;;; ── MOV ─────────────────────────────────────────────────────────────────────
 

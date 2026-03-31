@@ -83,8 +83,11 @@
     (test  al al)
     (jz    kbd-main-loop)
 
-    ;; Debug: got a mapped ASCII char — write '@' at row 5 col 2
-    (mov-rdi-word #x324 ,(logior (char-code #\@) #x0e00))
+    ;; Debug: write the translated char at a fixed position (row 5 col 2)
+    ;; so we can see what the table returned. EDX = 0x326 (row5 col2 offset).
+    (mov   edx #x326)
+    (store-rdi-edx-al 0)    ; write char at row 5 col 2
+    (store-rdi-edx-byte 1 #x0e)  ; yellow attr
 
     ;; Save ASCII char in BL (survives the cursor loads below)
     (mov   bl al)

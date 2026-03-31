@@ -1,7 +1,7 @@
 ;;;; test/kernel64.lisp — 64-bit kernel unit tests
 
 (defpackage #:ecclesia-test-kernel64
-  (:use #:cl #:ecclesia))
+  (:use #:cl #:ecclesia #:ecclesia.build))
 (in-package #:ecclesia-test-kernel64)
 
 (defun assert= (expected actual description)

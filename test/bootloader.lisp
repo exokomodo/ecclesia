@@ -1,7 +1,7 @@
 ;;;; test/unit.lisp — Ecclesia unit tests
 
 (defpackage #:ecclesia-test
-  (:use #:cl #:ecclesia))
+  (:use #:cl #:ecclesia.build))
 (in-package #:ecclesia-test)
 
 (defun assert= (expected actual description)

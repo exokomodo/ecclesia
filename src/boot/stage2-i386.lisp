@@ -11,33 +11,21 @@
 (in-package #:ecclesia.boot)
 
 (defun *stage2-i386* ()
-  `(;; ── 16-bit real mode entry ───────────────────────────────────────────────
+  `(;; ── 16-bit real mode ─────────────────────────────────────────────────────
     (bits 16)
     (org  #x8000)
-    (cli)
-    (xor  ax ax)
-    (mov  ds ax)
-    (mov  es ax)
-    (mov  ss ax)
-    (mov  sp #x7c00)
+    ,@(real-mode-init-forms)
 
-    ;; ── Enable A20 via keyboard controller ──────────────────────────────────
-    (in   al #x92)
-    (or   al #x02)
-    (out  #x92 al)
+    ;; ── Enable A20 ───────────────────────────────────────────────────────────
+    ,@(a20-enable-forms)
 
-    ;; ── Load GDT ────────────────────────────────────────────────────────────
+    ;; ── Load GDT ─────────────────────────────────────────────────────────────
     (lgdt (gdt-descriptor))
 
-    ;; ── Enter protected mode ─────────────────────────────────────────────────
-    (mov  eax cr0)
-    (or   eax #x01)
-    (mov  cr0 eax)
+    ;; ── Enter protected mode ──────────────────────────────────────────────────
+    ,@(enter-protected-mode-forms)
 
-    ;; Far jump to flush prefetch queue and enter 32-bit segment
-    (jmp  far #x08 pm-entry)
-
-    ;; ── GDT ─────────────────────────────────────────────────────────────────
+    ;; ── GDT ──────────────────────────────────────────────────────────────────
     (label gdt-start)
     (dq #x0000000000000000)  ; null descriptor
     (dq #x00cf9a000000ffff)  ; 0x08: 32-bit code, base=0, limit=4GB
@@ -45,19 +33,13 @@
     (label gdt-end)
 
     (label gdt-descriptor)
-    (dw (- gdt-end gdt-start 1))  ; limit
-    (dd gdt-start)                ; base
+    (dw (- gdt-end gdt-start 1))
+    (dd gdt-start)
 
     ;; ── 32-bit protected mode ─────────────────────────────────────────────────
     (bits 32)
     (label pm-entry)
-    (mov  ax #x10)
-    (mov  ds ax)
-    (mov  es ax)
-    (mov  fs ax)
-    (mov  gs ax)
-    (mov  ss ax)
-    (mov  esp #x90000)
+    ,@(setup-pm-segments-forms #x90000)
 
     ;; ── Clear screen ─────────────────────────────────────────────────────────
     ,@(vga-clear-forms)

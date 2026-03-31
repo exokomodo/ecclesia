@@ -60,6 +60,11 @@
    #:+stage2-sectors+
    #:+stage2-size+
    #:+code-size+
+   ;; Shared Stage 2 helpers
+   #:real-mode-init-forms
+   #:a20-enable-forms
+   #:enter-protected-mode-forms
+   #:setup-pm-segments-forms
    ;; Boot image symbols
    #:*bootloader*
    #:boot-message-db-forms

@@ -77,6 +77,9 @@
     (test  al al)
     (jz    kbd-main-loop)
 
+    ;; Debug: write '!' white at VGA row 5 col 0 to confirm we got a keypress
+    (mov-rdi-word #x3280 ,(logior (char-code #\!) #x0f00))
+
     ;; Save ASCII char in CL
     (mov   cl al)
 

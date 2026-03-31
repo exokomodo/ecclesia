@@ -409,6 +409,11 @@
          (args labels origin buf mode)
   (push-byte buf #xfe) (push-byte buf #x03))
 
+;; (dec-byte-rbx)  →  0xFE 0x0B  (DEC BYTE PTR [RBX])
+(definsn dec-byte-rbx (args mode) 2
+         (args labels origin buf mode)
+  (push-byte buf #xfe) (push-byte buf #x0b))
+
 ;; (store-zero-rbx)  →  0xC6 0x03 0x00  (MOV BYTE PTR [RBX], 0)
 (definsn store-zero-rbx (args mode) 3
          (args labels origin buf mode)

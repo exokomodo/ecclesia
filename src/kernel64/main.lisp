@@ -72,8 +72,36 @@
     (test  al al)
     (jz    kbd-main-loop)
 
-    ;; ── Write char at cursor position ────────────────────────────────────────
-    ;; AL = ASCII char.  Save it on the stack so cursor loads can use EAX.
+    ;; ── Handle backspace (ASCII 8) ───────────────────────────────────────────
+    (cmp8  al #x08)
+    (jnz   kbd-printable)
+
+    ;; Backspace: don't go past the prompt
+    (mov   rbx kbd-cursor-col)
+    (byte-loadsx-ecx-rbx)              ; ECX = current col
+    (cmp8  cl ,(length *prompt-str*))
+    (jz    kbd-main-loop)              ; at prompt edge — ignore
+
+    ;; Decrement cursor col
+    (dec-byte-rbx)
+
+    ;; Compute VGA offset for the cell we just backed into
+    (byte-loadsx-ecx-rbx)              ; ECX = new col (after dec)
+    (mov   rbx kbd-cursor-row)
+    (byte-loadsx-edx-rbx)              ; EDX = row
+    (imul  edx ,(* 2 +vga-cols+))      ; EDX = row * 160
+    (imul  ecx #x02)                   ; ECX = col * 2
+    (add   edx ecx)                    ; EDX = byte offset
+
+    ;; Write space to erase the character
+    (mov   rdi ,+vga-base+)
+    (store-rdi-edx-byte 0 #x20)        ; space
+    (store-rdi-edx-byte 1 #x0f)        ; white on black
+
+    (jmp   abs kbd-main-loop)
+
+    ;; ── Printable char: write at cursor position ─────────────────────────────
+    (label kbd-printable)
     (push-reg rax)
 
     ;; Load cursor row → EDX, cursor col → ECX

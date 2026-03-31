@@ -107,3 +107,33 @@
 (defun resolve-build-target ()
   "Return an ISA instance for the current *build-target*."
   (make-kernel-isa *build-target*))
+
+;;; ── Higher-level structural generics ────────────────────────────────────────
+;;;
+;;; These cover the parts of make-kernel-main that still depend on ISA:
+;;; dispatch between handlers, saving/restoring registers, and embedded data.
+
+(defgeneric embedded-data-forms (isa scancode-table-forms)
+  (:documentation
+   "Return forms for any data embedded within the kernel image — the scancode
+    table and cursor position bytes.  The exact layout may differ by ISA."))
+
+(defgeneric dispatch-to-handler-forms (isa)
+  (:documentation
+   "Return forms that inspect the translated ASCII value and branch to either
+    KBD-BACKSPACE or KBD-PRINTABLE.  The comparison and branch instructions
+    are ISA-specific."))
+
+(defgeneric save-char-forms (isa)
+  (:documentation
+   "Return forms that save the current character value before operations that
+    would clobber it (e.g. the screen-full check)."))
+
+(defgeneric restore-char-forms (isa)
+  (:documentation
+   "Return forms that restore the character value saved by save-char-forms."))
+
+(defgeneric discard-char-forms (isa)
+  (:documentation
+   "Return forms that discard a previously saved character (used on the
+    screen-full and other bail-out paths)."))

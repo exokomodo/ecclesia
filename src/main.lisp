@@ -1,15 +1,20 @@
 ;;;; main.lisp — kernel entry point (ISA-agnostic)
 ;;;;
-;;;; Constructs the kernel image by calling the pipeline generics on the
-;;;; ISA instance selected by ecclesia.kernel:*build-target*.
+;;;; This file contains NO ISA-specific instructions.  Every step is a call
+;;;; to a generic from ecclesia.kernel, dispatched on the ISA instance
+;;;; produced by (resolve-build-target).
 ;;;;
 ;;;; To build for a different ISA:
-;;;;   (setf ecclesia.kernel:*build-target* :arm64)  ; (once arm64 is implemented)
-;;;;   (setf ecclesia:*kernel-main* (ecclesia:make-kernel-main))
+;;;;   (setf ecclesia.kernel:*build-target* :arm64)
+;;;;   (make-kernel-main)
 
 (in-package #:ecclesia)
 
-;;; ── Scancode table ──────────────────────────────────────────────────────────
+;;; ── Scancode table data ──────────────────────────────────────────────────────
+;;;
+;;; The raw table lives here rather than in ecclesia.kernel because the
+;;; keyboard layout is an application-level concern, not an ISA concern.
+;;; The embedded-data-forms generic decides how it is laid out in memory.
 
 ;;; US QWERTY scancode set 1 → ASCII, unshifted (89 entries: 0x00–0x58)
 (defparameter *scancode-ascii*
@@ -28,27 +33,22 @@
 
 (defun make-kernel-main (&optional (isa (resolve-build-target)))
   "Return the kernel assembler form list for ISA (default: *build-target*).
-   The same structural description is used for every target; only the
-   ISA-specific generic implementations change."
+   Every line delegates to an ecclesia.kernel generic — no ISA assumptions here."
   `(;; ── Entry point ──────────────────────────────────────────────────────────
     (bits ,(isa-bits isa))
     (org  ,(isa-origin isa))
 
-    ;; ISA-specific prologue (stack pointer, baseline registers, etc.)
+    ;; ISA-specific setup: stack, baseline registers
     ,@(isa-entry-prologue-forms isa)
 
     ;; Print the prompt
     ,@(vga-rdi-write *prompt-str* :row *prompt-row* :col 0 :attr #x0a)
 
-    ;; Jump over embedded data tables
+    ;; Jump over embedded data
     (jmp abs kbd-main-loop)
 
-    ;; ── Embedded data ────────────────────────────────────────────────────────
-    (label kbd-ascii-table)
-    ,@(scancode-db-forms)
-
-    (label kbd-cursor-col) (db ,(length *prompt-str*))
-    (label kbd-cursor-row) (db ,*prompt-row*)
+    ;; ── Embedded data (layout determined by ISA) ──────────────────────────────
+    ,@(embedded-data-forms isa (scancode-db-forms))
 
     ;; ── Main loop ────────────────────────────────────────────────────────────
     (label kbd-main-loop)
@@ -56,42 +56,42 @@
     ;; 1. Wait for and read a scancode
     ,@(ps2-poll-forms isa)
 
-    ;; 2. Filter key releases and out-of-range scancodes
+    ;; 2. Filter releases and out-of-range codes
     ,@(scancode-filter-forms isa)
 
     ;; 3. Translate scancode → ASCII
     ,@(scancode-translate-forms isa)
 
-    ;; 4. Route: backspace vs. printable character
-    (cmp8  al #x08)
-    (jz    kbd-backspace)
-    (jmp   abs kbd-printable)
+    ;; 4. Dispatch to backspace or printable handler
+    ,@(dispatch-to-handler-forms isa)
 
-    ;; ── Backspace ────────────────────────────────────────────────────────────
+    ;; ── Backspace handler ─────────────────────────────────────────────────────
     (label kbd-backspace)
     ,@(backspace-forms isa)
-    (jmp   abs kbd-main-loop)
+    (jmp abs kbd-main-loop)
 
-    ;; ── Printable character ──────────────────────────────────────────────────
+    ;; ── Printable character handler ───────────────────────────────────────────
     (label kbd-printable)
 
-    ;; 5. Save char; reject if screen is full
-    (push-reg rax)
+    ;; 5. Save char across the screen-full check
+    ,@(save-char-forms isa)
+
+    ;; 6. Reject if screen is full
     ,@(screen-full-check-forms isa)
 
-    ;; 6. Compute VGA offset and write the character
+    ;; 7. Compute VGA offset and write the character
     ,@(vga-offset-forms isa)
-    (pop-reg rax)
+    ,@(restore-char-forms isa)
     ,@(vga-write-char-forms isa)
 
-    ;; 7. Advance cursor
+    ;; 8. Advance cursor
     ,@(cursor-advance-forms isa)
-    (jmp   abs kbd-main-loop)
+    (jmp abs kbd-main-loop)
 
-    ;; ── Screen full: discard char ─────────────────────────────────────────────
+    ;; ── Screen full: discard saved char and loop ───────────────────────────────
     (label kbd-full)
-    (pop-reg rax)
-    (jmp   abs kbd-main-loop)))
+    ,@(discard-char-forms isa)
+    (jmp abs kbd-main-loop)))
 
 ;;; Eagerly build the kernel image for the default build target.
 (defparameter *kernel-main* (make-kernel-main))

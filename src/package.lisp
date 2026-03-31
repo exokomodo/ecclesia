@@ -88,7 +88,13 @@
    #:vga-erase-char-forms
    #:cursor-advance-forms
    #:screen-full-check-forms
-   #:backspace-forms))
+   #:backspace-forms
+   ;; Structural generics (layout, dispatch, register save/restore)
+   #:embedded-data-forms
+   #:dispatch-to-handler-forms
+   #:save-char-forms
+   #:restore-char-forms
+   #:discard-char-forms))
 
 (defpackage #:ecclesia.kernel.x86-64
   (:use #:cl

@@ -152,3 +152,30 @@
   "x86-64 kernel prologue: set RSP and load VGA base into RDI."
   `((mov rsp ,(ecclesia.kernel:isa-stack-pointer isa))
     (mov rdi ,+vga-base+)))
+
+;;; ── Structural generics ──────────────────────────────────────────────────────
+
+(defmethod ecclesia.kernel:embedded-data-forms ((isa x86-64) scancode-table-forms)
+  "Lay out the ASCII table and cursor bytes in the instruction stream."
+  `((label kbd-ascii-table)
+    ,@scancode-table-forms
+    (label kbd-cursor-col) (db ,(length ecclesia.kernel:*prompt-str*))
+    (label kbd-cursor-row) (db ,ecclesia.kernel:*prompt-row*)))
+
+(defmethod ecclesia.kernel:dispatch-to-handler-forms ((isa x86-64))
+  "Compare AL to backspace (ASCII 8); branch to KBD-BACKSPACE or KBD-PRINTABLE."
+  '((cmp8 al #x08)
+    (jz   kbd-backspace)
+    (jmp  abs kbd-printable)))
+
+(defmethod ecclesia.kernel:save-char-forms ((isa x86-64))
+  "Push RAX (contains the ASCII char) onto the stack."
+  '((push-reg rax)))
+
+(defmethod ecclesia.kernel:restore-char-forms ((isa x86-64))
+  "Pop RAX from the stack, restoring the saved ASCII char."
+  '((pop-reg rax)))
+
+(defmethod ecclesia.kernel:discard-char-forms ((isa x86-64))
+  "Pop and discard the saved ASCII char from the stack."
+  '((pop-reg rax)))

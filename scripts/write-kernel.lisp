@@ -45,9 +45,12 @@
       (error "Stage 2 too large: ~d bytes (max ~d)" (length stage2) +stage2-size+))
 
     (format t "[ecclesia] Assembling 64-bit kernel...~%")
-    (let* ((kernel       (pad-to-sector (assemble *kernel-main*)))
+    (let* ((target-arch  (or (sb-ext:posix-getenv "TARGET_ARCH") "x86-64"))
+           (_            (setf *build-target* (intern (string-upcase target-arch) :keyword)))
+           (_            (setf *kernel-main*  (make-kernel-main)))
+           (kernel       (pad-to-sector (assemble *kernel-main*)))
            (content-size (+ +floppy-sector-size+ +stage2-size+ (length kernel)))
-           (output-path  "floppy.img"))
+           (output-path  (format nil "ecclesia_~a.img" target-arch)))
 
       (format t "[ecclesia] Writing ~a (~d bytes / 1.44MB)...~%~%" output-path +floppy-total-size+)
 

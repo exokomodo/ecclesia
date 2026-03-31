@@ -83,25 +83,24 @@
     (test  al al)
     (jz    kbd-main-loop)
 
-    ;; Save ASCII char in CL
-    (mov   cl al)
+    ;; Save ASCII char in BL (survives the cursor loads below)
+    (mov   bl al)
 
     ;; ── Compute VGA offset: (row*80 + col)*2 ─────────────────────────────
-    (mov   rbx kbd-cursor-col)
-    (byte-loadsx-ecx-rbx)              ; ECX = col  (wait, overwrites CL!)
-
-    ;; Problem: CL holds char, ECX used for col. Use different registers.
-    ;; char → BL, col → CL, row → DL, then compute in EDX
-
-    (mov   bl al)                      ; BL = char (save again)
     (mov   rbx kbd-cursor-col)
     (byte-loadsx-ecx-rbx)              ; ECX = col
     (mov   rbx kbd-cursor-row)
     (byte-loadsx-edx-rbx)              ; EDX = row
 
+    ;; Restore RBX for cursor col address (needed after char write)
+    (mov   rbx kbd-cursor-col)
+
     (imul  edx #x50)                   ; EDX = row * 80
     (add   edx ecx)                    ; EDX = row*80 + col
     (imul  edx #x02)                   ; EDX = byte offset
+
+    ;; Move char from BL → AL for store-rdi-edx-al
+    (mov   al bl)
 
     ;; Write char and attr to [RDI + EDX + 0] and [RDI + EDX + 1]
     (store-rdi-edx-al 0)               ; [RDI+EDX] = char

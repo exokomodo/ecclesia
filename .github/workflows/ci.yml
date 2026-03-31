@@ -35,8 +35,8 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: ecclesia-${{ matrix.target-arch }}
-          path: ecclesia-${{ matrix.target-arch }}.img
+          name: ecclesia_${{ matrix.target-arch }}
+          path: ecclesia_${{ matrix.target-arch }}.img
 
       - name: Unit Tests
         run: |

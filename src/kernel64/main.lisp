@@ -135,5 +135,32 @@
     (mov   rbx kbd-cursor-row)
     (inc-byte-rbx)
 
+    ;; Check if row >= 25 — need to scroll
+    (byte-loadsx-ecx-rbx)              ; ECX = new row
+    (cmp8  cl #x19)                    ; row >= 25?
+    (jc    kbd-no-wrap)                ; no — skip scroll
+
+    ;; ── Scroll screen up one row ─────────────────────────────────────────────
+    ;; Copy rows 1–24 → rows 0–23: 24 rows × 80 cols × 2 bytes = 3840 bytes
+    ;; = 960 dwords. RSI = src (row 1), RDI = dst (row 0).
+    (mov   rsi ,(+ +vga-base+ (* 2 +vga-cols+)))  ; row 1
+    (mov   rdi ,+vga-base+)                        ; row 0
+    (mov   ecx #x3c0)                              ; 960 dwords
+    (rep   movsd)
+
+    ;; Clear last row (row 24): 80 cells = 40 dwords of space+attr
+    ;; RDI already points to row 24 after REP MOVSD
+    (mov   eax #x0f200f20)             ; two cells: space + white-on-black
+    (mov   ecx #x28)                   ; 40 dwords = 80 cells
+    (rep   stosd)
+
+    ;; Set row back to 24
+    (mov   rbx kbd-cursor-row)
+    (store-zero-rbx)
+    ;; Store 24 by incrementing 24 times? No — need a byte store.
+    ;; Hack: write 0 then add 24 via loop... awful.
+    ;; Better: just dec the byte we already incremented (it's 25, make it 24)
+    (dec-byte-rbx)
+
     (label kbd-no-wrap)
     (jmp   abs kbd-main-loop)))

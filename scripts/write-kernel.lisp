@@ -16,11 +16,9 @@
 (in-package #:ecclesia)
 
 ;;; ── Constants ───────────────────────────────────────────────────────────────
+;;; +floppy-sector-size+, +stage2-sectors+, +stage2-size+ defined in src/boot/stage2-x86-64.lisp
 
-(defconstant +floppy-sector-size+ 512)
-(defconstant +floppy-total-size+  (* 2880 512))  ; standard 1.44MB
-(defconstant +stage2-sectors+     8)              ; up to 4KB for Stage 2
-(defconstant +stage2-size+        (* +stage2-sectors+ +floppy-sector-size+))
+(defconstant +floppy-total-size+ (* 2880 512))  ; standard 1.44MB
 
 ;;; ── Helpers ─────────────────────────────────────────────────────────────────
 

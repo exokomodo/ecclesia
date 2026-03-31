@@ -9,6 +9,11 @@
 
 (in-package #:ecclesia)
 
+;;; Stage 2 is loaded from floppy sectors 2-9 (8 sectors = 4KB max)
+(defconstant +floppy-sector-size+ 512)
+(defconstant +stage2-sectors+     8)
+(defconstant +stage2-size+        (* +stage2-sectors+ +floppy-sector-size+))
+
 (defun page-table-forms ()
   "Write identity-mapped page tables in 32-bit PM.
    Maps first 16MB as 8 × 2MB huge pages — covers VGA at 0xB8000.

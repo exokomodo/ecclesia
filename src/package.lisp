@@ -20,6 +20,9 @@
            #:vga-status
            #:vga-rdi-write
            #:vga-rdi-status
+           #:+floppy-sector-size+
+           #:+stage2-sectors+
+           #:+stage2-size+
            #:*stage2*
            #:stage2-size
            #:*kernel64*

@@ -1,4 +1,4 @@
-;;;; stage2.lisp — Stage 2: 32-bit PM → 64-bit long mode, print status, halt
+;;;; stage2-x86-64.lisp — Stage 2: 32-bit PM → 64-bit long mode, print status, halt
 ;;;;
 ;;;; Steps:
 ;;;;   1. Extend GDT with a 64-bit code segment (L=1)
@@ -8,6 +8,11 @@
 ;;;;   5. Print [  OK  ] status lines via vga-print.lisp helpers
 
 (in-package #:ecclesia)
+
+;;; Stage 2 is loaded from floppy sectors 2-9 (8 sectors = 4KB max)
+(defconstant +floppy-sector-size+ 512)
+(defconstant +stage2-sectors+     8)
+(defconstant +stage2-size+        (* +stage2-sectors+ +floppy-sector-size+))
 
 (defun page-table-forms ()
   "Write identity-mapped page tables in 32-bit PM.

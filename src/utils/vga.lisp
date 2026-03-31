@@ -1,4 +1,4 @@
-;;;; vga-print.lisp — VGA text buffer helpers
+;;;; vga.lisp — VGA text buffer helpers
 ;;;;
 ;;;; Two addressing flavours:
 ;;;;   vga-*        — absolute writes via (mem32 addr), safe in 16/32-bit mode

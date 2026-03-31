@@ -5,7 +5,7 @@
 ;;;;   2. Write identity-mapped page tables into 0x1000–0x3FFF (16MB)
 ;;;;   3. Enable PAE, load CR3, set EFER.LME, enable paging
 ;;;;   4. Far jump to 64-bit code segment
-;;;;   5. Print [  OK  ] status lines via vga-print.lisp helpers
+;;;;   5. Print [  OK  ] status lines via vga.lisp helpers
 
 (in-package #:ecclesia.build)
 

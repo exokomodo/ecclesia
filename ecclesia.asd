@@ -8,7 +8,7 @@
     :components
     ((:file "package")
      (:module "utils"
-      :components ((:file "vga-print")))
+      :components ((:file "vga")))
      (:module "build"
       :components
       ((:module "assembler"

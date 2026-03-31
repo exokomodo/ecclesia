@@ -14,10 +14,12 @@
                    (:file "x86-64")))
      (:module "boot"
       :components ((:file "bootloader-x86-64")
-                   (:file "stage2-x86-64")))
+                   (:file "stage2-x86-64")
+                   (:file "stage2-i386")))
      (:module "kernel"
       :components ((:file "interface")
-                   (:file "x86-64")))
+                   (:file "x86-64")
+                   (:file "i386")))
      (:file "main")))))
 
 (defsystem ecclesia/test

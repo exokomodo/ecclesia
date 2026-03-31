@@ -178,8 +178,8 @@
     ((and (r16-p dst)  (r16-p src))     (if (= mode 16)  2  3))
     ((and (r32-p dst)  (creg-p src))                     3)
     ((and (creg-p dst) (r32-p src))                      3)
-    ((and (r32-p dst)  (numberp src))                    5)
     ((and (r32-p dst)  (r32-p src))                      2)
+    ((and (r32-p dst)  (or (numberp src) (symbolp src)))  5)
     ((and (listp dst) (eq (car dst) 'mem32) (r32-p src)) 6)
     ((and (listp dst) (eq (car dst) 'mem32) (numberp src)) 10)
     ((and (r64-p dst) (or (numberp src) (symbolp src)))  10)
@@ -214,12 +214,12 @@
       ((and (creg-p dst) (r32-p src))
        (push-byte buf #x0f) (push-byte buf #x22)
        (push-byte buf (logior #xc0 (ash (enc *creg* dst) 3) (enc *r32* src))))
-      ((and (r32-p dst) (numberp src))
-       (push-byte buf (+ #xb8 (enc *r32* dst)))
-       (push-u32 buf src))
       ((and (r32-p dst) (r32-p src))
        (push-byte buf #x89)
        (push-byte buf (logior #xc0 (ash (enc *r32* src) 3) (enc *r32* dst))))
+      ((and (r32-p dst) (or (numberp src) (symbolp src)))
+       (push-byte buf (+ #xb8 (enc *r32* dst)))
+       (push-u32 buf (eval-expr src labels)))
       ((and (listp dst) (eq (car dst) 'mem32) (r32-p src))
        (push-byte buf #x89)
        (push-byte buf (logior #x05 (ash (enc *r32* src) 3)))
@@ -236,10 +236,15 @@
 ;;; ── OR ──────────────────────────────────────────────────────────────────────
 
 (definsn or (args mode)
-         (if (r32-p (first args)) 6 2)
+         (cond ((and (r8-p  (first args)) (numberp (second args))) 2)
+               ((and (r32-p (first args)) (numberp (second args))) 6)
+               (t 2))
          (args labels origin buf mode)
   (let ((dst (first args)) (src (second args)))
     (cond
+      ((and (r8-p dst) (eq dst 'al) (numberp src))
+       (push-byte buf #x0c)                      ; OR AL, imm8
+       (push-byte buf (logand src #xff)))
       ((and (r32-p dst) (numberp src))
        (push-byte buf #x81)
        (push-byte buf (logior #xc8 (enc *r32* dst)))
@@ -259,6 +264,12 @@
     (push-u16 buf (logand addr #xffff))))
 
 ;;; ── IN ──────────────────────────────────────────────────────────────────────
+
+;; (out port al) — OUT imm8, AL
+(definsn out (args mode) 2
+         (args labels origin buf mode)
+  (push-byte buf #xe6)
+  (push-byte buf (logand (first args) #xff)))
 
 (definsn in (args mode) 2
          (args labels origin buf mode)
@@ -395,12 +406,14 @@
 ;; (push-reg rax) → 0x50+r   (push-reg rbx) → 0x50+3 etc
 (definsn push-reg (args mode) 1
          (args labels origin buf mode)
-  (push-byte buf (+ #x50 (enc *r64* (first args)))))
+  (let ((reg (first args)))
+    (push-byte buf (+ #x50 (if (r64-p reg) (enc *r64* reg) (enc *r32* reg))))))
 
 ;; (pop-reg rax) → 0x58+r
 (definsn pop-reg (args mode) 1
          (args labels origin buf mode)
-  (push-byte buf (+ #x58 (enc *r64* (first args)))))
+  (let ((reg (first args)))
+    (push-byte buf (+ #x58 (if (r64-p reg) (enc *r64* reg) (enc *r32* reg))))))
 
 ;;; ── Byte operations via [RBX] ───────────────────────────────────────────────
 

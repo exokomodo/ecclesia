@@ -5,6 +5,7 @@
 ;;;; ecclesia.boot          — boot code
 ;;;; ecclesia.kernel        — ISA-agnostic kernel generics
 ;;;; ecclesia.kernel.x86-64 — x86-64 implementations of the kernel generics
+;;;; ecclesia.kernel.i386   — i386 (32-bit) implementations of the kernel generics
 ;;;; ecclesia               — kernel image definitions (*kernel-main*, etc.)
 
 (defpackage #:ecclesia.utils
@@ -64,6 +65,7 @@
    #:boot-message-db-forms
    #:*boot-message*
    #:*stage2*
+   #:*stage2-i386*
    #:stage2-size
    #:page-table-forms
    #:long-mode-entry-forms))
@@ -110,9 +112,13 @@
   (:use #:cl
         #:ecclesia.kernel
         #:ecclesia.utils)
-  (:export
-   ;; x86-64 method specializer symbol
-   #:x86-64))
+  (:export #:x86-64))
+
+(defpackage #:ecclesia.kernel.i386
+  (:use #:cl
+        #:ecclesia.kernel
+        #:ecclesia.utils)
+  (:export #:i386))
 
 (defpackage #:ecclesia
   (:use #:cl
@@ -120,6 +126,7 @@
         #:ecclesia.boot
         #:ecclesia.kernel
         #:ecclesia.kernel.x86-64
+        #:ecclesia.kernel.i386
         #:ecclesia.utils)
   (:export
    ;; Kernel image builder — call with an ISA instance or use *build-target*

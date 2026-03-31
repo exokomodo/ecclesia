@@ -2,7 +2,7 @@
 ;;;;
 ;;;; ecclesia.utils         — VGA helpers, common utilities
 ;;;; ecclesia.build         — build-time toolchain: assembler, boot code
-;;;; ecclesia.kernel        — ISA-agnostic kernel pipeline generics
+;;;; ecclesia.kernel        — ISA-agnostic kernel generics
 ;;;; ecclesia.kernel.x86-64 — x86-64 implementations of the kernel generics
 ;;;; ecclesia               — kernel image definitions (*kernel-main*, etc.)
 
@@ -79,7 +79,7 @@
    #:*build-target*
    #:make-kernel-isa
    #:resolve-build-target
-   ;; ISA-agnostic kernel pipeline — each method returns a list of asm forms
+   ;; ISA-agnostic kernel generics — each method returns a list of asm forms
    #:ps2-poll-forms
    #:scancode-filter-forms
    #:scancode-translate-forms

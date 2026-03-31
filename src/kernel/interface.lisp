@@ -1,4 +1,4 @@
-;;;; pipeline.lisp — ISA-agnostic kernel pipeline generics
+;;;; interface.lisp — ISA-agnostic kernel generics
 ;;;;
 ;;;; Each generic takes an ISA designator (a keyword or struct) as its first
 ;;;; argument and returns a list of assembler forms that implement that step.
@@ -13,6 +13,22 @@
 
 (in-package #:ecclesia.kernel)
 
+;;; ── Build-target selection ──────────────────────────────────────────────────
+
+(defparameter *build-target* :x86-64
+  "Keyword identifying the target ISA for the current build.
+   Supported values: :x86-64
+   Set this before calling resolve-build-target to select the implementation.")
+
+(defgeneric make-kernel-isa (target)
+  (:documentation
+   "Return a fresh ISA instance for TARGET (a keyword such as :x86-64).
+    Each ISA package provides an EQL-specialised method for its own keyword."))
+
+(defun resolve-build-target ()
+  "Return an ISA instance for the current *build-target*."
+  (make-kernel-isa *build-target*))
+
 ;;; ── Kernel configuration ────────────────────────────────────────────────────
 
 (defparameter *prompt-str*       "ecclesia> ")
@@ -22,7 +38,7 @@
 
 ;;; ── ISA descriptor protocol ─────────────────────────────────────────────────
 ;;;
-;;; An ISA class carries build-target metadata alongside the pipeline methods.
+;;; An ISA class carries build-target metadata alongside the generic methods.
 ;;; This lets make-kernel-forms select the right implementation and emit
 ;;; correct entry-point prologue (origin address, stack, etc.) without
 ;;; the caller having to know ISA details.
@@ -41,7 +57,7 @@
    "Return forms that set up the minimal runtime environment before the kernel
     main loop — stack pointer, any baseline register state, etc."))
 
-;;; ── Pipeline generics ───────────────────────────────────────────────────────
+;;; ── kernel generics ───────────────────────────────────────────────────────
 
 (defgeneric ps2-poll-forms (isa)
   (:documentation
@@ -91,22 +107,6 @@
     - If cursor is off-screen, snap back to the last visible cell.
     - If cursor is at or before the prompt edge, ignore the keypress.
     - Otherwise decrement the column and erase the vacated cell."))
-
-;;; ── Build-target selection ──────────────────────────────────────────────────
-
-(defparameter *build-target* :x86-64
-  "Keyword identifying the target ISA for the current build.
-   Supported values: :x86-64
-   Set this before calling resolve-build-target to select the implementation.")
-
-(defgeneric make-kernel-isa (target)
-  (:documentation
-   "Return a fresh ISA instance for TARGET (a keyword such as :x86-64).
-    Each ISA package provides an EQL-specialised method for its own keyword."))
-
-(defun resolve-build-target ()
-  "Return an ISA instance for the current *build-target*."
-  (make-kernel-isa *build-target*))
 
 ;;; ── Higher-level structural generics ────────────────────────────────────────
 ;;;

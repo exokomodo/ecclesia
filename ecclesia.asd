@@ -18,7 +18,7 @@
         :components ((:file "bootloader-x86-64")
                      (:file "stage2-x86-64")))))
      (:module "kernel"
-      :components ((:file "pipeline")
+      :components ((:file "interface")
                    (:file "x86-64")))
      (:file "main")))))
 

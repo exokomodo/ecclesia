@@ -65,11 +65,14 @@
     ;; ── Print OS header ──────────────────────────────────────────────────────
     ,@(vga-write "Ecclesia OS" :row 0 :col 0 :attr #x0e)
 
-    ;; ── Print [  OK  ] Protected Mode ───────────────────────────────────────
-    ,@(vga-status "Protected mode" :row 1 :ok t)
+    ;; ── Boot status lines ────────────────────────────────────────────────────
+    ,@(vga-status "A20 line enabled" :row 1 :ok t)
+    ,@(vga-status "GDT loaded" :row 2 :ok t)
+    ,@(vga-status "Entered 32-bit protected mode" :row 3 :ok t)
+    ,@(vga-status "Segment registers configured" :row 4 :ok t)
 
     ;; ── Jump to i386 kernel ──────────────────────────────────────────────────
-    ,@(vga-status "Jumping to kernel" :row 2 :ok t)
+    ,@(vga-status "Jumping to kernel" :row 5 :ok t)
     (jmp abs #x20000)))
 
 (defparameter *stage2-i386* (*stage2-i386*))

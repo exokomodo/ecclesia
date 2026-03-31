@@ -15,8 +15,8 @@ jobs:
     strategy:
       matrix:
         target-arch:
-          - x86_64
           - i386
+          - x86_64
 
     env:
       TARGET_ARCH: ${{ matrix.target-arch }}

@@ -108,8 +108,8 @@
     ;; Move char from BL → AL for store-rdi-edx-al
     (mov   al bl)
 
-    ;; Debug: also write at a known good position (row 7 col 0) so we
-    ;; can see what char is being written at all
+    ;; Debug: explicitly reload RDI then write at row 7 col 0
+    (mov   rdi #xb8000)
     (mov   edx #x460)     ; row 7 col 0 = (7*80)*2 = 1120 = 0x460
     (store-rdi-edx-al 0)
     (store-rdi-edx-byte 1 #x0f)

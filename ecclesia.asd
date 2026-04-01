@@ -16,7 +16,8 @@
       :components ((:file "bootloader-x86_64")
                    (:file "stage2-x86_base")
                    (:file "stage2-x86_64")
-                   (:file "stage2-i386")))
+                   (:file "stage2-i386")
+                   (:file "stage2-aarch64")))
      (:module "kernel"
       :components ((:file "interface")
                    (:file "x86_base")

@@ -40,7 +40,8 @@
     (let ((stage2 (pad-to-sector
                    (assemble (ecase arch-keyword
                                (:x86_64 *stage2*)
-                               (:i386   *stage2-i386*))))))
+                               (:i386   *stage2-i386*)
+                               (:aarch64 *stage2-aarch64*))))))
       (when (> (length stage2) +stage2-size+)
         (error "Stage 2 too large: ~d bytes (max ~d)" (length stage2) +stage2-size+))
 

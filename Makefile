@@ -16,10 +16,12 @@ WRITER      ?= scripts/write-kernel.lisp
 
 # Conditional variables
 ifeq ($(TARGET_ARCH),aarch64)
-QEMU_MACHINE_ARGS ?= -machine virt -serial stdio -display none
+QEMU_MACHINE_ARGS ?= -machine virt -nographic
+QEMU_MONITOR_ARGS ?=
 QEMU_BOOT_ARGS    ?= -drive file=$(FLOPPY),format=raw,if=none,id=bootdisk -device virtio-blk-device,drive=bootdisk
 else
 QEMU_MACHINE_ARGS ?=
+QEMU_MONITOR_ARGS ?= -monitor stdio
 QEMU_BOOT_ARGS    ?= -drive file=$(FLOPPY),if=floppy,format=raw
 endif
 
@@ -73,12 +75,12 @@ $(FLOPPY): $(SOURCES)
 .PHONY: boot
 boot: build ## Build and boot in QEMU
 	echo "[+] Launching in QEMU..."
-	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) -m 32 -monitor stdio
+	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) $(QEMU_MONITOR_ARGS) -m 32
 
 .PHONY: boot-once
 boot-once: build ## Boot in QEMU, halt instead of reboot on triple fault
 	echo "[+] Launching in QEMU (no-reboot)..."
-	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) -m 32 -monitor stdio -no-reboot -no-shutdown
+	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) $(QEMU_MONITOR_ARGS) -m 32 -no-reboot -no-shutdown
 
 .PHONY: build
 build: $(FLOPPY) ## Assemble kernel image via SBCL
@@ -104,7 +106,7 @@ clean/lisp: ## Force ASDF to recompile all Lisp sources on next build
 .PHONY: debug
 debug: build ## Build and boot in QEMU with GDB support
 	echo "[+] Launching in QEMU (GDB on :1234)..."
-	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) -m 32 -monitor stdio -s -S
+	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) $(QEMU_MONITOR_ARGS) -m 32 -s -S
 
 .PHONY: debug-log
 debug-log: build ## Boot with CPU exception logging to /tmp/qemu.log

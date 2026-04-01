@@ -6,6 +6,7 @@ SHELL := /bin/bash
 MAKEFLAGS += --no-print-directory
 
 UNAME_S := $(shell uname -s)
+AVAILABLE_ARCHITECTURES := x86_64 aarch64 i386
 
 # Variables
 TARGET_ARCH ?= x86_64
@@ -13,6 +14,7 @@ QEMU        ?= qemu-system-$(TARGET_ARCH)
 FLOPPY      ?= ecclesia-$(TARGET_ARCH).img
 WRITER      ?= scripts/write-kernel.lisp
 
+# Conditional variables
 ifeq ($(TARGET_ARCH),aarch64)
 QEMU_MACHINE_ARGS ?= -machine virt
 QEMU_BOOT_ARGS    ?= -drive file=$(FLOPPY),format=raw,if=none,id=bootdisk -device virtio-blk-device,drive=bootdisk
@@ -21,6 +23,12 @@ QEMU_MACHINE_ARGS ?=
 QEMU_BOOT_ARGS    ?= -drive file=$(FLOPPY),if=floppy,format=raw
 endif
 
+# Preconditions
+ifeq ($(filter $(TARGET_ARCH),$(AVAILABLE_ARCHITECTURES)),)
+$(error Unsupported TARGET_ARCH '$(TARGET_ARCH)'. Available: $(AVAILABLE_ARCHITECTURES))
+endif
+
+# Default exports
 export TARGET_ARCH
 
 # Source files
@@ -29,7 +37,12 @@ SOURCES   := ecclesia.asd $(wildcard src/*.lisp src/*.asm) $(WRITER)
 ##@ Environment Setup
 
 .PHONY: setup
-setup: setup/sbcl setup/qemu ## Install all development dependencies
+setup: setup/hooks setup/sbcl setup/qemu ## Install all development dependencies
+
+.PHONY: setup/hooks
+setup/hooks: ## Install git hooks
+	ln -sf "$(PWD)/git/hooks/pre-commit" .git/hooks/pre-commit
+	@echo "✅ Git hooks installed"
 
 .PHONY: setup/sbcl
 setup/sbcl: ## Install SBCL
@@ -70,6 +83,12 @@ boot-once: build ## Boot in QEMU, halt instead of reboot on triple fault
 .PHONY: build
 build: $(FLOPPY) ## Assemble kernel image via SBCL
 	:
+
+.PHONY: build/all
+build/all:
+	for arch in $(AVAILABLE_ARCHITECTURES); do
+		TARGET_ARCH=$${arch} $(MAKE) build
+	done
 
 .PHONY: clean
 clean: clean/floppy clean/lisp ## Remove build artifacts

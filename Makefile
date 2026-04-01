@@ -16,7 +16,7 @@ WRITER      ?= scripts/write-kernel.lisp
 
 # Conditional variables
 ifeq ($(TARGET_ARCH),aarch64)
-QEMU_MACHINE_ARGS ?= -machine virt
+QEMU_MACHINE_ARGS ?= -machine virt -serial stdio -display none
 QEMU_BOOT_ARGS    ?= -drive file=$(FLOPPY),format=raw,if=none,id=bootdisk -device virtio-blk-device,drive=bootdisk
 else
 QEMU_MACHINE_ARGS ?=

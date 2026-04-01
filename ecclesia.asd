@@ -11,7 +11,8 @@
       :components ((:file "vga")))
      (:module "assembler"
       :components ((:file "assembler")
-                   (:file "x86_64")))
+                   (:file "x86_64")
+                   (:file "aarch64")))
      (:module "boot"
       :components ((:file "bootloader-x86_64")
                    (:file "stage2-x86_base")

@@ -8,9 +8,9 @@ MAKEFLAGS += --no-print-directory
 UNAME_S := $(shell uname -s)
 
 # Variables
-TARGET_ARCH ?= x86-64
-QEMU        ?= qemu-system-x86_64
-FLOPPY      ?= ecclesia_$(TARGET_ARCH).img
+TARGET_ARCH ?= x86_64
+QEMU        ?= qemu-system-$(TARGET_ARCH)
+FLOPPY      ?= ecclesia-$(TARGET_ARCH).img
 WRITER      ?= scripts/write-kernel.lisp
 
 export TARGET_ARCH
@@ -68,7 +68,7 @@ clean: clean/floppy clean/lisp ## Remove build artifacts
 
 .PHONY: clean/floppy
 clean/floppy:
-	rm -f ecclesia_*.img
+	rm -f *.img
 
 .PHONY: clean/lisp
 clean/lisp: ## Force ASDF to recompile all Lisp sources on next build

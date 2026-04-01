@@ -11,13 +11,17 @@
       :components ((:file "vga")))
      (:module "assembler"
       :components ((:file "assembler")
-                   (:file "x86-64")))
+                   (:file "x86_64")))
      (:module "boot"
-      :components ((:file "bootloader-x86-64")
-                   (:file "stage2-x86-64")))
+      :components ((:file "bootloader-x86_64")
+                   (:file "stage2-x86_base")
+                   (:file "stage2-x86_64")
+                   (:file "stage2-i386")))
      (:module "kernel"
       :components ((:file "interface")
-                   (:file "x86-64")))
+                   (:file "x86_base")
+                   (:file "x86_64")
+                   (:file "i386")))
      (:file "main")))))
 
 (defsystem ecclesia/test

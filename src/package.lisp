@@ -4,7 +4,8 @@
 ;;;; ecclesia.assembler     — Generic assembler
 ;;;; ecclesia.boot          — boot code
 ;;;; ecclesia.kernel        — ISA-agnostic kernel generics
-;;;; ecclesia.kernel.x86-64 — x86-64 implementations of the kernel generics
+;;;; ecclesia.kernel.x86_64 — x86_64 implementations of the kernel generics
+;;;; ecclesia.kernel.i386   — i386 (32-bit) implementations of the kernel generics
 ;;;; ecclesia               — kernel image definitions (*kernel-main*, etc.)
 
 (defpackage #:ecclesia.utils
@@ -40,7 +41,7 @@
         #:ecclesia.assembler
         #:ecclesia.utils)
   (:export
-   ;; x86-64 register predicates and helpers
+   ;; x86_64 register predicates and helpers
    #:r8-p
    #:r16-p
    #:r32-p
@@ -59,11 +60,17 @@
    #:+stage2-sectors+
    #:+stage2-size+
    #:+code-size+
+   ;; Shared Stage 2 helpers
+   #:real-mode-init-forms
+   #:a20-enable-forms
+   #:enter-protected-mode-forms
+   #:setup-pm-segments-forms
    ;; Boot image symbols
    #:*bootloader*
    #:boot-message-db-forms
    #:*boot-message*
    #:*stage2*
+   #:*stage2-i386*
    #:stage2-size
    #:page-table-forms
    #:long-mode-entry-forms))
@@ -106,20 +113,34 @@
    #:asm-prelude-forms
    #:unconditional-jump-forms))
 
-(defpackage #:ecclesia.kernel.x86-64
+(defpackage #:ecclesia.kernel.x86-base
   (:use #:cl
         #:ecclesia.kernel
         #:ecclesia.utils)
-  (:export
-   ;; x86-64 method specializer symbol
-   #:x86-64))
+  (:export #:x86-base))
+
+(defpackage #:ecclesia.kernel.x86_64
+  (:use #:cl
+        #:ecclesia.kernel
+        #:ecclesia.kernel.x86-base
+        #:ecclesia.utils)
+  (:export #:x86_64))
+
+(defpackage #:ecclesia.kernel.i386
+  (:use #:cl
+        #:ecclesia.kernel
+        #:ecclesia.kernel.x86-base
+        #:ecclesia.utils)
+  (:export #:i386))
 
 (defpackage #:ecclesia
   (:use #:cl
         #:ecclesia.assembler
         #:ecclesia.boot
         #:ecclesia.kernel
-        #:ecclesia.kernel.x86-64
+        #:ecclesia.kernel.x86-base
+        #:ecclesia.kernel.x86_64
+        #:ecclesia.kernel.i386
         #:ecclesia.utils)
   (:export
    ;; Kernel image builder — call with an ISA instance or use *build-target*

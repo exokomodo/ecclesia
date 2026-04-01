@@ -15,7 +15,8 @@ jobs:
     strategy:
       matrix:
         target-arch:
-          - x86-64
+          - i386
+          - x86_64
 
     env:
       TARGET_ARCH: ${{ matrix.target-arch }}
@@ -35,8 +36,8 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: ecclesia_${{ matrix.target-arch }}
-          path: ecclesia_${{ matrix.target-arch }}.img
+          name: ecclesia-${{ matrix.target-arch }}
+          path: ecclesia-${{ matrix.target-arch }}.img
 
       - name: Unit Tests
         run: |

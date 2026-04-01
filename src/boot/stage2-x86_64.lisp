@@ -1,4 +1,4 @@
-;;;; stage2-x86-64.lisp — Stage 2: 32-bit PM → 64-bit long mode, print status, halt
+;;;; stage2-x86_64.lisp — Stage 2: 32-bit PM → 64-bit long mode, print status, halt
 ;;;;
 ;;;; Steps:
 ;;;;   1. Extend GDT with a 64-bit code segment (L=1)
@@ -84,19 +84,15 @@
   `(;; ===== 16-bit real mode =====
     (bits 16)
     (org  #x8000)
+    ,@(real-mode-init-forms)
 
-    (cli)
+    ;; ── Load GDT ─────────────────────────────────────────────────────────────
     (lgdt (gdt-ptr))
 
-    ;; Enable protected mode
-    (mov  eax cr0)
-    (or   eax #x01)
-    (mov  cr0 eax)
+    ;; ── Enter protected mode ──────────────────────────────────────────────────
+    ,@(enter-protected-mode-forms)
 
-    ;; Far jump to 32-bit PM (selector 0x08)
-    (jmp  far #x0008 pm-entry)
-
-    ;; ── GDT ──────────────────────────────────────────────────────────────
+    ;; ── GDT ──────────────────────────────────────────────────────────────────
     (label gdt-start)
     (dq #x0000000000000000)       ; 0x00: null
     (dq #x00cf9a000000ffff)       ; 0x08: 32-bit code (D=1)
@@ -111,14 +107,7 @@
     ;; ===== 32-bit protected mode =====
     (bits 32)
     (label pm-entry)
-
-    (mov  ax #x0010)
-    (mov  ds ax)
-    (mov  es ax)
-    (mov  fs ax)
-    (mov  gs ax)
-    (mov  ss ax)
-    (mov  esp #x90000)
+    ,@(setup-pm-segments-forms #x90000)
 
     ;; Clear screen
     ,@(vga-clear-forms)

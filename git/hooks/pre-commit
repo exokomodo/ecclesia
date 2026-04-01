@@ -11,9 +11,15 @@ else
   MAKE=make
 fi
 
-echo "Running ${MAKE} build across supported architectures..."
-if ! "${MAKE}" check; then
+echo "Running build across all supported architectures..."
+if ! "${MAKE}" build/all; then
   echo ""
-  echo "❌ ${MAKE} check failed. Fix the issues above before committing."
+  echo "❌ Build failed. Fix the issues above before committing."
+  exit 1
+fi
+
+if ! "${MAKE}" test/unit; then
+  echo ""
+  echo "❌ Unit tests failed. Fix the issues above before committing."
   exit 1
 fi

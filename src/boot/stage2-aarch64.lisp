@@ -11,9 +11,9 @@
     ;; UART initialization — PL011 at 0x09000000
     (mov x0 #x09000000)              ; UART base
     ;; Write "Stage 2 start" via UART
-    (mov x1 #'S) (strb x1 [x0, #0])  ; Transmit 'S'
-    (mov x1 #'2) (strb x1 [x0, #0])  ; Transmit '2'
-    (mov x1 #10) (strb x1 [x0, #0])  ; Transmit newline
+    (mov x1 #'S) (strb x1 (mem x0 #0))  ; Transmit 'S'
+    (mov x1 #'2) (strb x1 (mem x0 #0))  ; Transmit '2'
+    (mov x1 #10) (strb x1 (mem x0 #0))  ; Transmit newline
 
     ;; Next: Jump to kernel entry at 0x40000000
     (br #x40000000)))

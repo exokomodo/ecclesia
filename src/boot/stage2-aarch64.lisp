@@ -12,4 +12,3 @@
     ))
 
 (defparameter *stage2-aarch64* (*stage2-aarch64*))
-(defparameter *stage2-aarch64* (assemble *stage2-aarch64*))

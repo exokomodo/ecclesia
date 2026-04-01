@@ -71,6 +71,7 @@
    #:*boot-message*
    #:*stage2*
    #:*stage2-i386*
+      #:*stage2-aarch64*
    #:stage2-size
    #:page-table-forms
    #:long-mode-entry-forms))

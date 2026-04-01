@@ -124,6 +124,11 @@
   "Return the x86_64 ISA instance for the :x86_64 build target keyword."
   (make-instance 'x86_64))
 
+(defmethod ecclesia.kernel:make-kernel-isa ((target (eql :aarch64)))
+  "Temporary compatibility target: reuse the current 64-bit kernel ISA path
+   until a native AArch64 kernel backend is implemented."
+  (make-instance 'x86_64))
+
 (defmethod ecclesia.kernel:isa-bits ((isa x86_64))          64)
 (defmethod ecclesia.kernel:isa-origin ((isa x86_64))        #x100000)
 (defmethod ecclesia.kernel:isa-stack-pointer ((isa x86_64)) #x200000)

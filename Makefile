@@ -15,12 +15,12 @@ WRITER      ?= scripts/write-kernel.lisp
 
 # Per-arch image name and boot style
 ifeq ($(TARGET_ARCH),aarch64)
-IMAGE             ?= ecclesia-$(TARGET_ARCH).bin
+IMAGE             ?= build/ecclesia-$(TARGET_ARCH).bin
 QEMU_MACHINE_ARGS ?= -machine virt
 QEMU_MONITOR_ARGS ?= -monitor stdio
 QEMU_BOOT_ARGS    ?= -kernel $(IMAGE)
 else
-IMAGE             ?= ecclesia-$(TARGET_ARCH).img
+IMAGE             ?= build/ecclesia-$(TARGET_ARCH).img
 QEMU_MACHINE_ARGS ?=
 QEMU_MONITOR_ARGS ?= -monitor stdio
 QEMU_BOOT_ARGS    ?= -drive file=$(IMAGE),if=floppy,format=raw
@@ -71,6 +71,7 @@ endif
 
 $(IMAGE): $(SOURCES)
 	echo "[+] Building image..."
+	mkdir -p $$(dirname $(IMAGE))
 	./$(WRITER)
 
 .PHONY: boot

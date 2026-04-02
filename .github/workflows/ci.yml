@@ -33,11 +33,19 @@ jobs:
         run: |
           make build
 
-      - name: Upload build artifacts
+      - name: Upload raw image
         uses: actions/upload-artifact@v7
+        if: matrix.target-arch != 'aarch64'
         with:
           name: ecclesia-${{ matrix.target-arch }}
           path: ecclesia-${{ matrix.target-arch }}.img
+
+      - name: Upload bin image
+        uses: actions/upload-artifact@v7
+        if: matrix.target-arch == 'aarch64'
+        with:
+          name: ecclesia-${{ matrix.target-arch }}
+          path: ecclesia-${{ matrix.target-arch }}.bin
 
       - name: Unit Tests
         run: |

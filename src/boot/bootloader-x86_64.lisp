@@ -120,6 +120,7 @@
       (jc-short disk-error)    ; carry set = read failed
 
       ;; Jump to Stage 2 at 0x8000
+      ;; (ELF binary is loaded by Stage 2 before entering protected mode)
       (jmp  abs #x8000)
 
       ;; Disk error: print 'E' and halt

@@ -89,7 +89,14 @@
     ;; ── Screen full: discard saved char and loop ───────────────────────────────
     (label kbd-full)
     ,@(discard-char-forms isa)
-    ,@(unconditional-jump-forms isa 'kbd-main-loop)))
+    ,@(unconditional-jump-forms isa 'kbd-main-loop)
+
+    ;; ── Escape: invoke ELF loader (x86_64 only) ────────────────────────────
+    (label kbd-escape)
+    ,@(let ((loader (make-elf-loader isa)))
+        (if loader
+            loader
+            (unconditional-jump-forms isa 'kbd-main-loop)))))
 
 ;;; ── ELF loader stub ──────────────────────────────────────────────────────────
 

@@ -48,9 +48,9 @@
     (push-reg rbx)
     (mem-load64 rcx rbx ,+ph64-p-filesz+)
     (push-reg rcx)                ; save filesz
-    ;; RSI = ELF base + p_offset
+    ;; RSI = ELF base + p_offset  (rdx already = p_offset; add base)
     (mov-r64 rsi rdx)
-    (add rsi ,elf-load-addr)      ; rsi = elf_base + p_offset
+    (add-imm64 rsi ,elf-load-addr) ; rsi = p_offset + elf_base
     ;; REP MOVSB — copy filesz bytes
     (rep movsb)
 

@@ -31,7 +31,14 @@
     (movx x19 #x09000000)
     ;; Set up stack pointer
     (movx x9 ,(ecclesia.kernel:isa-stack-pointer isa))
-    (movsp x9)))
+    (movsp x9)
+    ;; ── OS banner (equivalent to Stage 2 status lines on x86) ──────────────
+    ,@(uart-puts-forms "Ecclesia OS")
+    ,@(uart-putc-forms 13)   ; CR
+    ,@(uart-putc-forms 10)   ; LF
+    ,@(uart-puts-forms "[ OK ] AArch64 kernel loaded")
+    ,@(uart-putc-forms 13)
+    ,@(uart-putc-forms 10)))
 
 ;;; ── UART write helpers ───────────────────────────────────────────────────────
 ;;;
@@ -93,21 +100,38 @@
     (beq kbd-backspace)
     (b kbd-printable)))
 
-;;; vga-write-char-forms → write w0 to UART
+;;; vga-write-char-forms → write w0 to UART, increment column counter
+;;; x18 = address of uart-col byte (loaded once at start of printable handler)
 (defmethod ecclesia.kernel:vga-write-char-forms ((isa aarch64))
-  `((strb w0 (mem x19))))
+  `(;; Write character to UART
+    (strb w0 (mem x19))
+    ;; Increment column counter at uart-col
+    (movx x18 uart-col)
+    (ldrb w1 (mem x18))
+    (add-imm x1 x1 1)
+    (strb w1 (mem x18))))
 
-;;; vga-erase-char-forms → send backspace sequence: BS SP BS
+;;; vga-erase-char-forms → BS SP BS, only if column > 0
 (defmethod ecclesia.kernel:vga-erase-char-forms ((isa aarch64))
-  (append (uart-putc-forms 8)    ; BS
-          (uart-putc-forms 32)   ; space
-          (uart-putc-forms 8)))  ; BS
+  `(;; Check column counter — don't backspace past column 0
+    (movx x18 uart-col)
+    (ldrb w1 (mem x18))
+    (cmp-imm w1 0)
+    (beq uart-bs-done)
+    ;; Decrement column
+    (sub-imm x1 x1 1)
+    (strb w1 (mem x18))
+    ;; Emit BS SP BS
+    ,@(uart-putc-forms 8)
+    ,@(uart-putc-forms 32)
+    ,@(uart-putc-forms 8)
+    (label uart-bs-done)))
 
-;;; vga-offset-forms → no VGA offset needed for UART
+;;; vga-offset-forms → reset column on newline detection (not needed for basic echo)
 (defmethod ecclesia.kernel:vga-offset-forms ((isa aarch64))
   '())
 
-;;; cursor-advance-forms → no cursor tracking needed for UART
+;;; cursor-advance-forms → reset column counter on newline
 (defmethod ecclesia.kernel:cursor-advance-forms ((isa aarch64))
   '())
 
@@ -115,32 +139,30 @@
 (defmethod ecclesia.kernel:screen-full-check-forms ((isa aarch64))
   '())
 
-;;; backspace-forms → erase char via UART escape
+;;; backspace-forms → delegate to vga-erase-char-forms
 (defmethod ecclesia.kernel:backspace-forms ((isa aarch64))
   (ecclesia.kernel:vga-erase-char-forms (make-instance 'aarch64)))
 
-;;; save/restore/discard: use x20 as scratch (callee-saved)
-(defmethod ecclesia.kernel:save-char-forms ((isa aarch64))
-  '((movx x20 0)   ; placeholder — w0 is already the char, just preserve it
-    ))
+;;; save/restore/discard: w0 is never clobbered (no screen-full or VGA offset
+;;; logic for UART), so these are all noops.
+(defmethod ecclesia.kernel:save-char-forms    ((isa aarch64)) '())
+(defmethod ecclesia.kernel:restore-char-forms ((isa aarch64)) '())
+(defmethod ecclesia.kernel:discard-char-forms ((isa aarch64)) '())
 
-(defmethod ecclesia.kernel:restore-char-forms ((isa aarch64))
-  '())  ; w0 still holds the char
-
-(defmethod ecclesia.kernel:discard-char-forms ((isa aarch64))
-  '())
-
-;;; print-prompt-forms → write prompt string to UART then newline
+;;; print-prompt-forms → write prompt string to UART, then reset column counter
 (defmethod ecclesia.kernel:print-prompt-forms ((isa aarch64) str row)
   (declare (ignore row))
   (append (uart-puts-forms str)
-          (uart-putc-forms 10)))  ; newline after prompt
+          ;; Reset column counter to length of prompt string
+          `((movx x18 uart-col)
+            (movx x1 ,(length str))
+            (strb w1 (mem x18)))))
 
 ;;; unconditional-jump-forms → AArch64 B label
 (defmethod ecclesia.kernel:unconditional-jump-forms ((isa aarch64) label)
   `((b ,label)))
 
-;;; embedded-data-forms → not needed for UART kernel (no lookup table)
+;;; embedded-data-forms → just the uart-col byte
 (defmethod ecclesia.kernel:embedded-data-forms ((isa aarch64) scancode-table-forms)
   (declare (ignore scancode-table-forms))
-  '())
+  `((label uart-col) (db 0)))

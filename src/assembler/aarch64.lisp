@@ -94,16 +94,27 @@
             (if (zerop hw2) 0 1)
             (if (zerop hw3) 0 1)))))
 
-(defun aa-movz-emit (buf rd src)
-  "Emit MOVZ + optional MOVKs to load SRC into X register Rd."
+(defun aa-movz-emit (buf rd src &key fixed-size)
+  "Emit MOVZ + optional MOVKs to load SRC into X register Rd.
+   When FIXED-SIZE is true, always emit 4 instructions (pad with NOPs)
+   so that size is constant regardless of the immediate value."
   (let ((hw0 (logand src #xffff))
         (hw1 (logand (ash src -16) #xffff))
         (hw2 (logand (ash src -32) #xffff))
-        (hw3 (logand (ash src -48) #xffff)))
-    (push-u32-le buf (encode-movz rd hw0 0))
-    (unless (zerop hw1) (push-u32-le buf (encode-movk rd hw1 1)))
-    (unless (zerop hw2) (push-u32-le buf (encode-movk rd hw2 2)))
-    (unless (zerop hw3) (push-u32-le buf (encode-movk rd hw3 3)))))
+        (hw3 (logand (ash src -48) #xffff))
+        (count 0))
+    (push-u32-le buf (encode-movz rd hw0 0)) (incf count)
+    (if (or fixed-size (not (zerop hw1)))
+        (progn (push-u32-le buf (encode-movk rd hw1 1)) (incf count)))
+    (if (or fixed-size (not (zerop hw2)))
+        (progn (push-u32-le buf (encode-movk rd hw2 2)) (incf count)))
+    (if (or fixed-size (not (zerop hw3)))
+        (progn (push-u32-le buf (encode-movk rd hw3 3)) (incf count)))
+    ;; Pad to 4 instructions if fixed-size requested
+    (when fixed-size
+      (loop while (< count 4)
+            do (push-u32-le buf #xd503201f) ; NOP
+               (incf count)))))
 
 ;;; Register a new mnemonic MOVX (MOV for AArch64 X registers) to avoid
 ;;; colliding with the x86 MOV in the global instruction table.
@@ -117,16 +128,18 @@
           (src (second args)))
       (cond
         ((and (aa-r64-p dst) (integerp src)) (aa-movz-size src))
+        ;; Label reference — worst case 4 instructions (MOVZ + 3 MOVK) for 64-bit addr
+        ((and (aa-r64-p dst) (symbolp src))  16)
         (t (error "Unknown MOVX form: ~a ~a" dst src)))))
   (lambda (args labels origin buf mode)
     (declare (ignore mode))
-    (let ((dst (first args))
-          (src (if (symbolp (second args))
-                   (eval-expr (second args) labels)
-                   (second args))))
+    (let* ((dst (first args))
+           (src (second args))
+           (sym-p (symbolp src))
+           (val   (if sym-p (eval-expr src labels) src)))
       (cond
-        ((and (aa-r64-p dst) (integerp src))
-         (aa-movz-emit buf (enc-r64 dst) src))
+        ((aa-r64-p dst)
+         (aa-movz-emit buf (enc-r64 dst) val :fixed-size sym-p))
         (t (error "Unknown MOVX emit: ~a ~a" dst src))))))
 
 ;;; STRB Wn, [Xm] — store byte, unscaled offset 0

@@ -1,13 +1,17 @@
 #!/usr/bin/env -S sbcl --script
 ;;;; scripts/write-kernel.lisp — Ecclesia build script
 ;;;;
-;;;; Assembles Stage 1, Stage 2, and the kernel into a bootable 1.44MB floppy.
+;;;; For x86 targets (x86_64, i386):
+;;;;   Assembles Stage 1, Stage 2, and the kernel into a bootable 1.44MB floppy image.
+;;;;   Layout:
+;;;;     Sector 1     (0x0000): Stage 1 MBR            (512 bytes)
+;;;;     Sectors 2-9  (0x0200): Stage 2                 (up to 4KB)
+;;;;     Sectors 10+  (0x1200): kernel                  (padded to sector boundary)
+;;;;     Remainder:             zero-padded to 1.44MB
 ;;;;
-;;;; Layout:
-;;;;   Sector 1     (0x0000): Stage 1 MBR            (512 bytes)
-;;;;   Sectors 2-9  (0x0200): Stage 2                 (up to 4KB)
-;;;;   Sectors 10+  (0x1200): kernel                  (padded to sector boundary)
-;;;;   Remainder:             zero-padded to 1.44MB
+;;;; For aarch64:
+;;;;   Assembles the kernel only as a flat binary (.bin).
+;;;;   QEMU loads it directly via -kernel flag at 0x40000000.
 ;;;;
 ;;;; TARGET_ARCH environment variable selects the build target (default: x86_64).
 
@@ -30,43 +34,61 @@
 (let* ((target-arch  (or (sb-ext:posix-getenv "TARGET_ARCH") "x86_64"))
        (arch-keyword (intern (string-upcase target-arch) :keyword)))
 
-  (format t "[ecclesia] Assembling Stage 1 (MBR)...~%")
-  (let ((stage1 (assemble *bootloader*)))
-    (unless (= (length stage1) +floppy-sector-size+)
-      (error "Stage 1 must be exactly ~d bytes, got ~d"
-             +floppy-sector-size+ (length stage1)))
+  (setf *build-target* arch-keyword)
 
-    (format t "[ecclesia] Assembling Stage 2 [~a]...~%" target-arch)
-    (let ((stage2 (pad-to-sector
-                   (assemble (ecase arch-keyword
-                               (:x86_64 *stage2*)
-                               (:i386   *stage2-i386*)
-                               (:aarch64 *stage2-aarch64*))))))
-      (when (> (length stage2) +stage2-size+)
-        (error "Stage 2 too large: ~d bytes (max ~d)" (length stage2) +stage2-size+))
+  (cond
+    ;; ── AArch64: flat kernel binary, no bootloader ─────────────────────────
+    ((eq arch-keyword :aarch64)
+     (format t "[ecclesia] Assembling kernel [aarch64]...~%")
+     (setf *kernel-main* (make-kernel-main))
+     (let* ((kernel      (assemble *kernel-main*))
+            (output-path "ecclesia-aarch64.bin"))
+       (format t "[ecclesia] Writing ~a (~d bytes)...~%~%" output-path (length kernel))
+       (with-open-file (out output-path
+                            :direction :output
+                            :element-type '(unsigned-byte 8)
+                            :if-exists :supersede)
+         (write-sequence kernel out))
+       (format t "[ecclesia] Done.~%")
+       (format t "  Kernel:  ~4d bytes~%" (length kernel))))
 
-      (format t "[ecclesia] Assembling kernel [~a]...~%" target-arch)
-      (setf *build-target* arch-keyword)
-      (setf *kernel-main*  (make-kernel-main))
-      (let* ((kernel       (pad-to-sector (assemble *kernel-main*)))
-             (content-size (+ +floppy-sector-size+ +stage2-size+ (length kernel)))
-             (output-path  (format nil "ecclesia-~a.img" target-arch)))
+    ;; ── x86 targets: full floppy image ────────────────────────────────────
+    (t
+     (format t "[ecclesia] Assembling Stage 1 (MBR)...~%")
+     (let ((stage1 (assemble *bootloader*)))
+       (unless (= (length stage1) +floppy-sector-size+)
+         (error "Stage 1 must be exactly ~d bytes, got ~d"
+                +floppy-sector-size+ (length stage1)))
 
-        (format t "[ecclesia] Writing ~a (~d bytes / 1.44MB)...~%~%"
-                output-path +floppy-total-size+)
+       (format t "[ecclesia] Assembling Stage 2 [~a]...~%" target-arch)
+       (let ((stage2 (pad-to-sector
+                      (assemble (ecase arch-keyword
+                                  (:x86_64 *stage2*)
+                                  (:i386   *stage2-i386*))))))
+         (when (> (length stage2) +stage2-size+)
+           (error "Stage 2 too large: ~d bytes (max ~d)" (length stage2) +stage2-size+))
 
-        (with-open-file (out output-path
-                             :direction :output
-                             :element-type '(unsigned-byte 8)
-                             :if-exists :supersede)
-          (write-sequence stage1 out)
-          (write-sequence stage2 out)
-          (loop repeat (- +stage2-size+ (length stage2)) do (write-byte 0 out))
-          (write-sequence kernel out)
-          (loop repeat (- +floppy-total-size+ content-size) do (write-byte 0 out)))
+         (format t "[ecclesia] Assembling kernel [~a]...~%" target-arch)
+         (setf *kernel-main* (make-kernel-main))
+         (let* ((kernel       (pad-to-sector (assemble *kernel-main*)))
+                (content-size (+ +floppy-sector-size+ +stage2-size+ (length kernel)))
+                (output-path  (format nil "ecclesia-~a.img" target-arch)))
 
-        (format t "[ecclesia] Done.~%")
-        (format t "  Stage 1: ~4d bytes~%" (length stage1))
-        (format t "  Stage 2: ~4d bytes~%" (length stage2))
-        (format t "  Kernel:  ~4d bytes~%" (length kernel))
-        (format t "  Total:   ~4d bytes~%" +floppy-total-size+)))))
+           (format t "[ecclesia] Writing ~a (~d bytes / 1.44MB)...~%~%"
+                   output-path +floppy-total-size+)
+
+           (with-open-file (out output-path
+                                :direction :output
+                                :element-type '(unsigned-byte 8)
+                                :if-exists :supersede)
+             (write-sequence stage1 out)
+             (write-sequence stage2 out)
+             (loop repeat (- +stage2-size+ (length stage2)) do (write-byte 0 out))
+             (write-sequence kernel out)
+             (loop repeat (- +floppy-total-size+ content-size) do (write-byte 0 out)))
+
+           (format t "[ecclesia] Done.~%")
+           (format t "  Stage 1: ~4d bytes~%" (length stage1))
+           (format t "  Stage 2: ~4d bytes~%" (length stage2))
+           (format t "  Kernel:  ~4d bytes~%" (length kernel))
+           (format t "  Total:   ~4d bytes~%" +floppy-total-size+)))))))

@@ -11,18 +11,19 @@ AVAILABLE_ARCHITECTURES := x86_64 aarch64 i386
 # Variables
 TARGET_ARCH ?= x86_64
 QEMU        ?= qemu-system-$(TARGET_ARCH)
-FLOPPY      ?= ecclesia-$(TARGET_ARCH).img
 WRITER      ?= scripts/write-kernel.lisp
 
-# Conditional variables
+# Per-arch image name and boot style
 ifeq ($(TARGET_ARCH),aarch64)
+IMAGE             ?= ecclesia-$(TARGET_ARCH).bin
 QEMU_MACHINE_ARGS ?= -machine virt
 QEMU_MONITOR_ARGS ?= -monitor stdio
-QEMU_BOOT_ARGS    ?= -drive file=$(FLOPPY),format=raw,if=none,id=bootdisk -device virtio-blk-device,drive=bootdisk
+QEMU_BOOT_ARGS    ?= -kernel $(IMAGE)
 else
+IMAGE             ?= ecclesia-$(TARGET_ARCH).img
 QEMU_MACHINE_ARGS ?=
 QEMU_MONITOR_ARGS ?= -monitor stdio
-QEMU_BOOT_ARGS    ?= -drive file=$(FLOPPY),if=floppy,format=raw
+QEMU_BOOT_ARGS    ?= -drive file=$(IMAGE),if=floppy,format=raw
 endif
 
 # Preconditions
@@ -68,8 +69,8 @@ endif
 
 ##@ Development Tasks
 
-$(FLOPPY): $(SOURCES)
-	echo "[+] Building floppy image..."
+$(IMAGE): $(SOURCES)
+	echo "[+] Building image..."
 	./$(WRITER)
 
 .PHONY: boot
@@ -83,7 +84,7 @@ boot-once: build ## Boot in QEMU, halt instead of reboot on triple fault
 	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) $(QEMU_MONITOR_ARGS) -m 32 -no-reboot -no-shutdown
 
 .PHONY: build
-build: $(FLOPPY) ## Assemble kernel image via SBCL
+build: $(IMAGE) ## Assemble kernel image via SBCL
 	:
 
 .PHONY: build/all
@@ -93,11 +94,11 @@ build/all:
 	done
 
 .PHONY: clean
-clean: clean/floppy clean/lisp ## Remove build artifacts
+clean: clean/images clean/lisp ## Remove build artifacts
 
-.PHONY: clean/floppy
-clean/floppy:
-	rm -f *.img
+.PHONY: clean/images
+clean/images:
+	rm -f *.img *.bin
 
 .PHONY: clean/lisp
 clean/lisp: ## Force ASDF to recompile all Lisp sources on next build

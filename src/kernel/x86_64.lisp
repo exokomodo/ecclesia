@@ -143,11 +143,7 @@
     (label kbd-cursor-col) (db ,(length ecclesia.kernel:*prompt-str*))
     (label kbd-cursor-row) (db ,ecclesia.kernel:*prompt-row*)))
 
-(defmethod ecclesia.kernel:dispatch-to-handler-forms ((isa x86_64))
-  "Compare AL to backspace (ASCII 8); branch to KBD-BACKSPACE or KBD-PRINTABLE."
-  '((cmp8 al #x08)
-    (jz   kbd-backspace)
-    (jmp  abs kbd-printable)))
+;;; dispatch-to-handler-forms inherited from x86-base (includes ESC → kbd-escape).
 
 (defmethod ecclesia.kernel:save-char-forms ((isa x86_64))
   "Push RAX (contains the ASCII char) onto the stack."

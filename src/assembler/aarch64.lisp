@@ -46,10 +46,14 @@
 
 (defun enc-r64 (reg)
   (or (cdr (assoc reg *r64-aa*))
+      ;; Accept W registers as aliases (same encoding, context determines width)
+      (cdr (assoc reg *r32-aa*))
       (error "Unknown AArch64 X register: ~a" reg)))
 
 (defun enc-r32 (reg)
   (or (cdr (assoc reg *r32-aa*))
+      ;; Accept X registers as aliases
+      (cdr (assoc reg *r64-aa*))
       (error "Unknown AArch64 W register: ~a" reg)))
 
 ;;; ── Emit helpers ─────────────────────────────────────────────────────────────
@@ -385,6 +389,59 @@
                         (ash rn 5)
                         31)))               ; Rd = SP
       (push-u32-le buf enc))))
+
+;;; UDIV Wd, Wn, Wm — unsigned divide (32-bit)
+;;; Encoding: 0 00 11010110 Rm 000011 Rn Rd
+
+(register-instruction 'udiv
+  (lambda (args mode) (declare (ignore args mode)) 4)
+  (lambda (args labels origin buf mode)
+    (declare (ignore labels origin mode))
+    (let* ((rd (enc-r32 (first args)))
+           (rn (enc-r32 (second args)))
+           (rm (enc-r32 (third args)))
+           (enc (logior #x1AC00C00 (ash rm 16) (ash rn 5) rd)))
+      (push-u32-le buf enc))))
+
+;;; MSUB Wd, Wn, Wm, Wa — Wd = Wa - Wn*Wm (32-bit)
+;;; Encoding: 0 00 11011 000 Rm 1 Ra Rn Rd
+
+(register-instruction 'msub
+  (lambda (args mode) (declare (ignore args mode)) 4)
+  (lambda (args labels origin buf mode)
+    (declare (ignore labels origin mode))
+    (let* ((rd (enc-r32 (first args)))
+           (rn (enc-r32 (second args)))
+           (rm (enc-r32 (third args)))
+           (ra (enc-r32 (fourth args)))
+           (enc (logior #x1B008000 (ash rm 16) (ash ra 10) (ash rn 5) rd)))
+      (push-u32-le buf enc))))
+
+;;; Additional conditional branches (B.cond variants)
+
+(defun make-bcond (base-enc)
+  (list
+   (lambda (args mode) (declare (ignore args mode)) 4)
+   (lambda (args labels origin buf mode)
+     (declare (ignore mode))
+     (let* ((target (eval-expr (first args) labels))
+            (pc     (+ origin (fill-pointer buf)))
+            (rel    (ash (- target pc) -2))
+            (enc    (logior base-enc (ash (logand rel #x7ffff) 5))))
+       (push-u32-le buf enc)))))
+
+;; BLT — branch if less than (signed, N≠V)
+(apply #'register-instruction 'blt (make-bcond #x5400000b))
+;; BGE — branch if greater or equal (signed, N=V)
+(apply #'register-instruction 'bge (make-bcond #x5400000a))
+;; BHI — branch if higher (unsigned, C=1 and Z=0)
+(apply #'register-instruction 'bhi (make-bcond #x54000008))
+;; BLS — branch if lower or same (unsigned, C=0 or Z=1)
+(apply #'register-instruction 'bls (make-bcond #x54000009))
+;; BHS/BCS — branch if higher or same (unsigned ≥, C=1)
+(apply #'register-instruction 'bhs (make-bcond #x54000002))
+;; BLO/BCC — branch if lower (unsigned <, C=0)
+(apply #'register-instruction 'blo (make-bcond #x54000003))
 
 ;;; RET — return (alias for BR X30)
 

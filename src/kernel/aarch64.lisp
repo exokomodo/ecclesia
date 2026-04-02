@@ -112,31 +112,123 @@
     (beq kbd-backspace)
     (b kbd-printable)))
 
-;;; vga-write-char-forms → write w0 to UART, increment column counter
-;;; x18 = address of uart-col byte (loaded once at start of printable handler)
+;;; vga-write-char-forms → write w0 to UART, track column and row
+;;;
+;;; After writing, increment uart-col.
+;;; If uart-col reaches 80, save it to uart-prev-col, reset to 0, increment uart-row.
 (defmethod ecclesia.kernel:vga-write-char-forms ((isa aarch64))
   `(;; Write character to UART
     (strb w0 (mem x19))
-    ;; Increment column counter at uart-col
+    ;; Increment column counter
     (movx x18 uart-col)
     (ldrb w1 (mem x18))
     (add-imm x1 x1 1)
+    ;; Check if col hit terminal width (80)
+    (cmp-imm w1 80)
+    (bne uart-write-col-done)
+    ;; Wrap: save current col to uart-prev-col, reset to 0, increment row
+    (movx x18 uart-prev-col)
+    (strb w1 (mem x18))          ; save col (=80) as prev marker
+    (movx x18 uart-row)
+    (ldrb w2 (mem x18))
+    (add-imm x2 x2 1)
+    (strb w2 (mem x18))
+    (movx x1 0)
+    (label uart-write-col-done)
+    (movx x18 uart-col)
     (strb w1 (mem x18))))
 
-;;; vga-erase-char-forms → BS SP BS, only if column > 0
+;;; vga-erase-char-forms
+;;;
+;;; Two cases:
+;;;   col > 0  → simple BS SP BS
+;;;   col = 0  → we wrapped; go up one row via ANSI ESC[A, then move
+;;;               to column uart-prev-col-at-wrap via BS-chain or ESC[nG
+;;;
+;;; We use ANSI escape sequences:
+;;;   ESC [ A        — cursor up 1 line
+;;;   ESC [ <n> G    — cursor to column n (1-based)
+;;;
+;;; uart-prev-col holds the column value at the last newline/wrap.
+;;; uart-row holds the current row (0 = at or above prompt row, no up allowed).
+
+(defun uart-ansi-cursor-up-forms ()
+  "Emit ESC [ A — cursor up one line."
+  (append (uart-putc-forms 27)   ; ESC
+          (uart-putc-forms 91)   ; [
+          (uart-putc-forms 65))) ; A
+
+(defun uart-ansi-cursor-col-forms ()
+  "Emit ESC [ <col+1> G — move cursor to 1-based column.
+   Input: x4 = 0-based column. Uses x5,x6,x7,x8 as scratch."
+  `(;; ESC [
+    ,@(uart-putc-forms 27)
+    ,@(uart-putc-forms 91)
+    ;; x5 = x4 + 1 (1-based column)
+    (add-imm x5 x4 1)
+    ;; x6 = 10 (divisor)
+    (movx x6 10)
+    ;; x7 = x5 / 10 (tens digit)
+    (udiv w7 w5 w6)
+    ;; skip leading zero if tens=0
+    (cmp-imm w7 0)
+    (beq uart-col-ones)
+    (add-imm x8 x7 48)        ; ASCII digit
+    (strb w8 (mem x19))
+    (label uart-col-ones)
+    ;; x8 = x5 - x7*10 (ones digit) via MSUB
+    (msub w8 w7 w6 w5)
+    (add-imm x8 x8 48)
+    (strb w8 (mem x19))
+    ;; 'G'
+    ,@(uart-putc-forms 71)))
+
 (defmethod ecclesia.kernel:vga-erase-char-forms ((isa aarch64))
-  `(;; Check column counter — don't backspace past column 0
+  `(;; Load current column into w1
     (movx x18 uart-col)
     (ldrb w1 (mem x18))
     (cmp-imm w1 0)
+    (bne uart-bs-simple)     ; col > 0: simple backspace
+
+    ;; col = 0: check row — if row = 0, nothing to do
+    (movx x18 uart-row)
+    (ldrb w2 (mem x18))
+    (cmp-imm w2 0)
     (beq uart-bs-done)
-    ;; Decrement column
-    (sub-imm x1 x1 1)
+
+    ;; Move up: decrement row
+    (sub-imm w2 w2 1)
+    (movx x18 uart-row)
+    (strb w2 (mem x18))
+
+    ;; Restore col to uart-prev-col
+    (movx x18 uart-prev-col)
+    (ldrb w1 (mem x18))
+    (movx x18 uart-col)
     (strb w1 (mem x18))
-    ;; Emit BS SP BS
+
+    ;; Emit ESC[A (cursor up)
+    ,@(uart-ansi-cursor-up-forms)
+
+    ;; Emit ESC[nG (cursor to column uart-prev-col, 1-based)
+    ;; x4 = x1 (already the column)
+    (add-imm x4 x1 0)
+    ,@(uart-ansi-cursor-col-forms)
+
+    ;; Erase the char at this position: SP then back
+    ,@(uart-putc-forms 32)
+    ,@(uart-putc-forms 8)
+    (b uart-bs-done)
+
+    ;; Simple case: col > 0
+    (label uart-bs-simple)
+    (sub-imm w1 w1 1)
+    (movx x18 uart-col)
+    (strb w1 (mem x18))
     ,@(uart-putc-forms 8)
     ,@(uart-putc-forms 32)
     ,@(uart-putc-forms 8)
+
     (label uart-bs-done)))
 
 ;;; vga-offset-forms → reset column on newline detection (not needed for basic echo)
@@ -174,9 +266,13 @@
 (defmethod ecclesia.kernel:unconditional-jump-forms ((isa aarch64) label)
   `((b ,label)))
 
-;;; embedded-data-forms → uart-col padded to 4-byte alignment
-;;; AArch64 requires all instructions to be 4-byte aligned.
-;;; The (db 0) is 1 byte; pad to 4 bytes so kbd-main-loop is aligned.
+;;; embedded-data-forms — 4-byte-aligned data block
+;;;   uart-col      — current column (0-79)
+;;;   uart-row      — current row relative to prompt (0 = first line)
+;;;   uart-prev-col — column count before the last wrap (for backspace recovery)
+;;; Each label gets 4 bytes to maintain alignment.
 (defmethod ecclesia.kernel:embedded-data-forms ((isa aarch64) scancode-table-forms)
   (declare (ignore scancode-table-forms))
-  `((label uart-col) (db 0) (db 0) (db 0) (db 0)))
+  `((label uart-col)      (db 0) (db 0) (db 0) (db 0)
+    (label uart-row)      (db 0) (db 0) (db 0) (db 0)
+    (label uart-prev-col) (db 0) (db 0) (db 0) (db 0)))

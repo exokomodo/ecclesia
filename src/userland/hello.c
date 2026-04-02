@@ -14,7 +14,6 @@ void _start(void) {
     for (int i = 0; msg[i]; i++) {
         vga[i] = VGA_ATTR | (unsigned char)msg[i];
     }
-    /* Return to kernel by halting — kernel will eventually
-     * provide a proper return mechanism via #25 */
-    __asm__ volatile ("hlt");
+    /* Spin — kernel will eventually provide a return mechanism via #25 */
+    while (1) {}
 }

@@ -79,6 +79,11 @@
     (mem-load64 rax rsi ,+elf64-e-entry+)
     (jmp-reg rax)
 
-    ;; ── Bad magic: print 'E' and halt ────────────────────────────────────
+    ;; ── Bad magic: write "ELF?" in red at known VGA addresses and halt ────
+    ;; Row 7 = offset 7*80*2 = 1120 = 0x460 from 0xB8000 → 0xB8460
     (label elf-bad-magic)
+    (mov (mem32 #xb8460) #x0c45)  ; 'E' red
+    (mov (mem32 #xb8462) #x0c4c)  ; 'L' red
+    (mov (mem32 #xb8464) #x0c46)  ; 'F' red
+    (mov (mem32 #xb8466) #x0c3f)  ; '?' red
     (hlt)))

@@ -135,9 +135,24 @@
         #:ecclesia.utils)
   (:export #:i386))
 
+(defpackage #:ecclesia.kernel.board
+  (:use #:cl)
+  (:export #:board
+           #:make-board
+           #:board-uart-base
+           #:board-qemu-machine
+           #:board-qemu-cpu
+           #:board-kernel-load-address
+           #:board-stack-top
+           ;; Board classes
+           #:qemu-virt
+           #:raspi4b
+           #:raspi3b))
+
 (defpackage #:ecclesia.kernel.aarch64
   (:use #:cl
         #:ecclesia.kernel
+        #:ecclesia.kernel.board
         #:ecclesia.utils)
   (:export #:aarch64))
 
@@ -146,6 +161,7 @@
         #:ecclesia.assembler
         #:ecclesia.boot
         #:ecclesia.kernel
+        #:ecclesia.kernel.board
         #:ecclesia.kernel.x86-base
         #:ecclesia.kernel.x86_64
         #:ecclesia.kernel.i386

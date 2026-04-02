@@ -24,6 +24,11 @@
                    (:file "x86_base")
                    (:file "x86_64")
                    (:file "i386")
+                   (:module "board"
+                    :components ((:file "interface")
+                                 (:file "qemu-virt")
+                                 (:file "raspi4b")
+                                 (:file "raspi3b")))
                    (:file "aarch64")))
      (:file "main")))))
 

@@ -6,16 +6,28 @@
 
 (in-package #:ecclesia.kernel.aarch64)
 
-(defclass aarch64 () ())
+(defclass aarch64 ()
+  ((board :initarg :board :reader aarch64-board))
+  (:documentation "AArch64 ISA instance — carries a board for hardware specifics."))
+
+(defparameter *default-aarch64-board* :qemu-virt
+  "Default board keyword used when no TARGET_BOARD env var is set.")
 
 (defmethod ecclesia.kernel:make-kernel-isa ((target (eql :aarch64)))
-  (make-instance 'aarch64))
+  (let* ((board-key (intern (string-upcase
+                              (or (sb-ext:posix-getenv "TARGET_BOARD")
+                                  (symbol-name *default-aarch64-board*)))
+                            :keyword))
+         (board (make-board board-key)))
+    (make-instance 'aarch64 :board board)))
 
-;;; ── ISA metadata ─────────────────────────────────────────────────────────────
+;;; ── ISA metadata — delegate to board where appropriate ──────────────────────
 
 (defmethod ecclesia.kernel:isa-bits          ((isa aarch64)) 64)
-(defmethod ecclesia.kernel:isa-origin        ((isa aarch64)) #x40000000)
-(defmethod ecclesia.kernel:isa-stack-pointer ((isa aarch64)) #x40100000)
+(defmethod ecclesia.kernel:isa-origin        ((isa aarch64))
+  (board-kernel-load-address (aarch64-board isa)))
+(defmethod ecclesia.kernel:isa-stack-pointer ((isa aarch64))
+  (board-stack-top (aarch64-board isa)))
 
 ;;; ── Assembler prelude ────────────────────────────────────────────────────────
 
@@ -28,7 +40,7 @@
 
 (defmethod ecclesia.kernel:isa-entry-prologue-forms ((isa aarch64))
   `(;; Load UART base into x19 (preserved across calls)
-    (movx x19 #x09000000)
+    (movx x19 ,(board-uart-base (aarch64-board isa)))
     ;; Set up stack pointer
     (movx x9 ,(ecclesia.kernel:isa-stack-pointer isa))
     (movsp x9)

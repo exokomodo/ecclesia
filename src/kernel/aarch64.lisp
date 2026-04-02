@@ -1,0 +1,146 @@
+;;;; aarch64.lisp — AArch64 kernel ISA implementation
+;;;;
+;;;; Target: QEMU virt machine, loaded at 0x40000000 via -kernel.
+;;;; Output: PL011 UART at 0x09000000.
+;;;; Input:  PL011 UART receive (polling).
+
+(in-package #:ecclesia.kernel.aarch64)
+
+(defclass aarch64 () ())
+
+(defmethod ecclesia.kernel:make-kernel-isa ((target (eql :aarch64)))
+  (make-instance 'aarch64))
+
+;;; ── ISA metadata ─────────────────────────────────────────────────────────────
+
+(defmethod ecclesia.kernel:isa-bits          ((isa aarch64)) 64)
+(defmethod ecclesia.kernel:isa-origin        ((isa aarch64)) #x40000000)
+(defmethod ecclesia.kernel:isa-stack-pointer ((isa aarch64)) #x40100000)
+
+;;; ── Assembler prelude ────────────────────────────────────────────────────────
+
+(defmethod ecclesia.kernel:asm-prelude-forms ((isa aarch64))
+  `((bits 64)
+    (org  ,(ecclesia.kernel:isa-origin isa))))
+
+;;; ── Entry prologue ───────────────────────────────────────────────────────────
+;;; x19 = UART base (callee-saved, available throughout)
+
+(defmethod ecclesia.kernel:isa-entry-prologue-forms ((isa aarch64))
+  `(;; Load UART base into x19 (preserved across calls)
+    (movx x19 #x09000000)
+    ;; Set up stack pointer
+    (movx x9 ,(ecclesia.kernel:isa-stack-pointer isa))
+    (movsp x9)))
+
+;;; ── UART write helpers ───────────────────────────────────────────────────────
+;;;
+;;; uart-putc-forms: emit a single ASCII char (integer literal) to UART.
+;;; uart-puts-forms: emit a string literal, one char at a time.
+
+(defun uart-putc-forms (char-code)
+  "Emit forms to write a single ASCII byte to UART (x19 = UART base)."
+  `((movx x1 ,char-code)
+    (strb w1 (mem x19))))
+
+(defun uart-puts-forms (str)
+  "Emit forms to write each character of STR to UART."
+  (loop for c across str
+        appending (uart-putc-forms (char-code c))))
+
+;;; ── Prompt print ─────────────────────────────────────────────────────────────
+;;; Called from make-kernel-main via vga-rdi-write dispatch.
+;;; For AArch64 we override the whole prompt section.
+
+(defmethod ecclesia.kernel:isa-entry-prologue-forms :after ((isa aarch64))
+  ;; nothing extra — prompt printed by vga-write-char-forms override
+  nil)
+
+;;; ── Generics: UART replaces VGA ──────────────────────────────────────────────
+
+;;; ps2-poll-forms → UART receive polling
+;;; PL011 UARTFR (Flag Register) at base+0x18, bit 4 = RXFE (receive FIFO empty)
+;;; PL011 UARTDR (Data Register) at base+0x00
+
+(defmethod ecclesia.kernel:ps2-poll-forms ((isa aarch64))
+  `((label kbd-poll)
+    ;; Read UARTFR into w1
+    (movx x2 #x18)           ; offset of UARTFR
+    (add-imm x2 x19 #x18)    ; x2 = UART base + 0x18
+    (ldrb w1 (mem x2))       ; w1 = UARTFR
+    ;; Test RXFE (bit 4) — if set, no data yet
+    (movx x3 16)              ; bit 4 = 0x10
+    (tst-imm w1 #x10)
+    (bne kbd-poll)
+    ;; Read UARTDR (byte at base+0x00) into w0 (= al equivalent)
+    (ldrb w0 (mem x19))))    ; w0 = received byte
+
+;;; scancode-filter-forms → no scancode concept for UART, pass through
+(defmethod ecclesia.kernel:scancode-filter-forms ((isa aarch64))
+  '()) ; UART gives ASCII directly — no filtering needed
+
+;;; scancode-translate-forms → identity (UART already gives ASCII in w0)
+(defmethod ecclesia.kernel:scancode-translate-forms ((isa aarch64))
+  '())
+
+;;; dispatch-to-handler-forms → check for backspace (0x7f or 0x08)
+(defmethod ecclesia.kernel:dispatch-to-handler-forms ((isa aarch64))
+  `((movx x1 #x7f)
+    (cmp-imm w0 #x7f)
+    (beq kbd-backspace)
+    (movx x1 #x08)
+    (cmp-imm w0 #x08)
+    (beq kbd-backspace)
+    (b kbd-printable)))
+
+;;; vga-write-char-forms → write w0 to UART
+(defmethod ecclesia.kernel:vga-write-char-forms ((isa aarch64))
+  `((strb w0 (mem x19))))
+
+;;; vga-erase-char-forms → send backspace sequence: BS SP BS
+(defmethod ecclesia.kernel:vga-erase-char-forms ((isa aarch64))
+  (append (uart-putc-forms 8)    ; BS
+          (uart-putc-forms 32)   ; space
+          (uart-putc-forms 8)))  ; BS
+
+;;; vga-offset-forms → no VGA offset needed for UART
+(defmethod ecclesia.kernel:vga-offset-forms ((isa aarch64))
+  '())
+
+;;; cursor-advance-forms → no cursor tracking needed for UART
+(defmethod ecclesia.kernel:cursor-advance-forms ((isa aarch64))
+  '())
+
+;;; screen-full-check-forms → UART has no screen limit
+(defmethod ecclesia.kernel:screen-full-check-forms ((isa aarch64))
+  '())
+
+;;; backspace-forms → erase char via UART escape
+(defmethod ecclesia.kernel:backspace-forms ((isa aarch64))
+  (ecclesia.kernel:vga-erase-char-forms (make-instance 'aarch64)))
+
+;;; save/restore/discard: use x20 as scratch (callee-saved)
+(defmethod ecclesia.kernel:save-char-forms ((isa aarch64))
+  '((movx x20 0)   ; placeholder — w0 is already the char, just preserve it
+    ))
+
+(defmethod ecclesia.kernel:restore-char-forms ((isa aarch64))
+  '())  ; w0 still holds the char
+
+(defmethod ecclesia.kernel:discard-char-forms ((isa aarch64))
+  '())
+
+;;; print-prompt-forms → write prompt string to UART then newline
+(defmethod ecclesia.kernel:print-prompt-forms ((isa aarch64) str row)
+  (declare (ignore row))
+  (append (uart-puts-forms str)
+          (uart-putc-forms 10)))  ; newline after prompt
+
+;;; unconditional-jump-forms → AArch64 B label
+(defmethod ecclesia.kernel:unconditional-jump-forms ((isa aarch64) label)
+  `((b ,label)))
+
+;;; embedded-data-forms → not needed for UART kernel (no lookup table)
+(defmethod ecclesia.kernel:embedded-data-forms ((isa aarch64) scancode-table-forms)
+  (declare (ignore scancode-table-forms))
+  '())

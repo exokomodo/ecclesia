@@ -112,7 +112,8 @@
    #:discard-char-forms
    ;; Assembler meta-generics
    #:asm-prelude-forms
-   #:unconditional-jump-forms))
+   #:unconditional-jump-forms
+   #:print-prompt-forms))
 
 (defpackage #:ecclesia.kernel.x86-base
   (:use #:cl
@@ -134,6 +135,12 @@
         #:ecclesia.utils)
   (:export #:i386))
 
+(defpackage #:ecclesia.kernel.aarch64
+  (:use #:cl
+        #:ecclesia.kernel
+        #:ecclesia.utils)
+  (:export #:aarch64))
+
 (defpackage #:ecclesia
   (:use #:cl
         #:ecclesia.assembler
@@ -142,6 +149,7 @@
         #:ecclesia.kernel.x86-base
         #:ecclesia.kernel.x86_64
         #:ecclesia.kernel.i386
+        #:ecclesia.kernel.aarch64
         #:ecclesia.utils)
   (:export
    ;; Kernel image builder — call with an ISA instance or use *build-target*

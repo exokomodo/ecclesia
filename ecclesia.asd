@@ -23,7 +23,8 @@
       :components ((:file "interface")
                    (:file "x86_base")
                    (:file "x86_64")
-                   (:file "i386")))
+                   (:file "i386")
+                   (:file "aarch64")))
      (:file "main")))))
 
 (defsystem ecclesia/test

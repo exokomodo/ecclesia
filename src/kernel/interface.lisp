@@ -148,3 +148,9 @@
   (:documentation
    "Return forms that perform an unconditional jump to LABEL.
     The encoding (near, far, etc.) is ISA-specific."))
+
+(defgeneric print-prompt-forms (isa str row)
+  (:documentation
+   "Return forms that print STR as the initial kernel prompt.
+    For VGA ISAs this writes into the framebuffer; for UART ISAs it
+    transmits the string over the serial port."))

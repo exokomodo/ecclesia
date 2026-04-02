@@ -256,6 +256,123 @@
                          rd)))
       (push-u32-le buf enc))))
 
+;;; LDRB Wt, [Xn] — load byte, unsigned offset 0
+;;; Encoding: 00 111 001 01 imm12(0) Rn Rt
+
+(register-instruction 'ldrb
+  (lambda (args mode) (declare (ignore args mode)) 4)
+  (lambda (args labels origin buf mode)
+    (declare (ignore labels origin mode))
+    (let* ((dst  (first args))
+           (addr (second args))
+           (base (if (listp addr) (second (canonicalize-form addr)) addr))
+           (rt   (if (aa-r32-p dst) (enc-r32 dst) (enc-r64 dst)))
+           (rn   (enc-r64 base))
+           (enc  (logior (ash #b00 30)
+                         (ash #b111 27)
+                         (ash #b01 24)
+                         (ash #b01 22)   ; opc = 01 (load)
+                         (ash 0 10)
+                         (ash rn 5)
+                         rt)))
+      (push-u32-le buf enc))))
+
+;;; TST Wn, #imm — test bits (ANDS WZR, Wn, #imm)
+;;; Use a simple immediate AND form. For our purposes (bit 4 = 0x10),
+;;; encode ANDS (32-bit) with immediate bitmask.
+;;; Encoding: 0 11 100100 N immr imms Rn Rd(WZR=31)
+
+(defun encode-logical-imm-32 (imm)
+  "Encode a 32-bit logical immediate. Returns (N immr imms) or NIL if not encodable.
+   We handle simple power-of-two masks only for now."
+  ;; For a single-bit mask like 0x10 = bit 4:
+  ;; imms = bit_width - 1 = 0 (for 1-bit element), immr = rotation
+  ;; Simplified: for 0x10 we need element size 32, one bit set.
+  ;; Use the generic formula for a single 1-bit run.
+  (let* ((bit (loop for i from 0 below 32
+                    when (logbitp i imm) return i))
+         (width (loop for i from 0 below 32
+                      count (logbitp i imm))))
+    (when (and bit width (= width 1))
+      ;; Single bit set at position BIT
+      ;; N=0, immr=(32-bit) mod 32, imms=0 (one bit wide - 1)
+      (list 0 (mod (- 32 bit) 32) 0))))
+
+(register-instruction 'tst-imm
+  (lambda (args mode) (declare (ignore args mode)) 4)
+  (lambda (args labels origin buf mode)
+    (declare (ignore labels origin mode))
+    (let* ((rn   (enc-r32 (first args)))
+           (imm  (second args))
+           (enc-parts (encode-logical-imm-32 imm)))
+      (unless enc-parts (error "TST-IMM: unencodable immediate #x~x" imm))
+      (destructuring-bind (n immr imms) enc-parts
+        (let ((enc (logior (ash #b0 31)        ; sf=0 (32-bit)
+                           (ash #b11 29)       ; opc=11 (ANDS)
+                           (ash #b100100 23)
+                           (ash n 22)
+                           (ash immr 16)
+                           (ash imms 10)
+                           (ash rn 5)
+                           31)))               ; Rd = WZR
+          (push-u32-le buf enc))))))
+
+;;; BNE label — branch if not equal (Z=0)
+;;; Encoding: 0101010 0 cond(0001) imm19 0
+
+(register-instruction 'bne
+  (lambda (args mode) (declare (ignore args mode)) 4)
+  (lambda (args labels origin buf mode)
+    (declare (ignore mode))
+    (let* ((target (eval-expr (first args) labels))
+           (pc     (+ origin (fill-pointer buf)))
+           (rel    (ash (- target pc) -2))
+           (enc    (logior #x54000001        ; B.NE
+                           (ash (logand rel #x7ffff) 5))))
+      (push-u32-le buf enc))))
+
+;;; BEQ label — branch if equal (Z=1)
+
+(register-instruction 'beq
+  (lambda (args mode) (declare (ignore args mode)) 4)
+  (lambda (args labels origin buf mode)
+    (declare (ignore mode))
+    (let* ((target (eval-expr (first args) labels))
+           (pc     (+ origin (fill-pointer buf)))
+           (rel    (ash (- target pc) -2))
+           (enc    (logior #x54000000        ; B.EQ
+                           (ash (logand rel #x7ffff) 5))))
+      (push-u32-le buf enc))))
+
+;;; CMP-IMM Wn, #imm12 — compare (SUBS WZR, Wn, #imm12)
+;;; Encoding: 0 1 1 0001011 shift(00) imm12 Rn Rd(WZR=31)
+
+(register-instruction 'cmp-imm
+  (lambda (args mode) (declare (ignore args mode)) 4)
+  (lambda (args labels origin buf mode)
+    (declare (ignore labels origin mode))
+    (let* ((rn  (enc-r32 (first args)))
+           (imm (second args))
+           (enc (logior #x71000000           ; SUBS W WZR, Wn, #imm
+                        (ash (logand imm #xfff) 10)
+                        (ash rn 5)
+                        31)))
+      (push-u32-le buf enc))))
+
+;;; MOVSP Xn — move Xn into SP (MOV SP, Xn = ADD SP, Xn, #0)
+;;; Encoding: 1 0 0 10001 00 000000000000 Xn SP(31)
+
+(register-instruction 'movsp
+  (lambda (args mode) (declare (ignore args mode)) 4)
+  (lambda (args labels origin buf mode)
+    (declare (ignore labels origin mode))
+    (let* ((rn  (enc-r64 (first args)))
+           (enc (logior #x91000000           ; ADD (64-bit, imm=0)
+                        (ash 0 10)           ; imm12=0
+                        (ash rn 5)
+                        31)))               ; Rd = SP
+      (push-u32-le buf enc))))
+
 ;;; RET — return (alias for BR X30)
 
 (register-instruction 'ret

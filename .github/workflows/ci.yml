@@ -30,6 +30,14 @@ jobs:
         run: |
           make setup/sbcl
 
+      - name: Install cross-compiler toolchain
+        run: |
+          make setup/toolchain
+
+      - name: Build userland [${{ matrix.target-arch }}]
+        run: |
+          make userland
+
       - name: Build [${{ matrix.target-arch }}]
         run: |
           make build

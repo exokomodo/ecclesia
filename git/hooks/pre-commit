@@ -11,6 +11,9 @@ else
   MAKE=make
 fi
 
+echo "Building userland programs..."
+"${MAKE}" userland/all 2>/dev/null || true  # best-effort: skip if no cross-compiler
+
 echo "Running build across all supported architectures..."
 if ! "${MAKE}" build/all; then
   echo ""

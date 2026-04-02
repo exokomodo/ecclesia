@@ -60,7 +60,7 @@ SOURCES   := ecclesia.asd $(wildcard src/*.lisp src/*.asm) $(WRITER)
 ##@ Environment Setup
 
 .PHONY: setup
-setup: setup/hooks setup/sbcl setup/qemu ## Install all development dependencies
+setup: setup/hooks setup/sbcl setup/qemu setup/toolchain ## Install all development dependencies
 
 .PHONY: setup/hooks
 setup/hooks: ## Install git hooks
@@ -80,11 +80,31 @@ endif
 .PHONY: setup/qemu
 setup/qemu: ## Install QEMU
 ifeq ($(UNAME_S),Linux)
-	sudo apt update && sudo apt install -y qemu-system-x86
+	sudo apt update && sudo apt install -y qemu-system-x86 qemu-system-arm
 else ifeq ($(UNAME_S),Darwin)
 	brew install qemu
 else
 	$(error "Unsupported OS: $(UNAME_S). Please install QEMU manually.")
+endif
+
+.PHONY: setup/toolchain
+setup/toolchain: ## Install cross-compilers for all supported architectures
+ifeq ($(UNAME_S),Linux)
+	sudo apt update && sudo apt install -y \
+	    gcc \
+	    gcc-x86-64-linux-gnu \
+	    gcc-i686-linux-gnu \
+	    gcc-aarch64-linux-gnu \
+	    binutils-x86-64-linux-gnu \
+	    binutils-i686-linux-gnu \
+	    binutils-aarch64-linux-gnu
+	@echo "✅ Cross-compilers installed"
+else ifeq ($(UNAME_S),Darwin)
+	brew install x86_64-elf-gcc i686-elf-gcc aarch64-elf-gcc 2>/dev/null || \
+	brew install x86_64-elf-binutils i686-elf-binutils aarch64-elf-binutils
+	@echo "✅ Cross-compilers installed (via Homebrew)"
+else
+	$(error "Unsupported OS: $(UNAME_S). Please install cross-compilers manually.")
 endif
 
 ##@ Development Tasks
@@ -119,7 +139,7 @@ clean: clean/images clean/lisp ## Remove build artifacts
 
 .PHONY: clean/images
 clean/images:
-	rm -f build/*.img build/*.bin *.img *.bin
+	rm -f build/*.img build/*.bin build/*.elf *.img *.bin
 
 .PHONY: clean/lisp
 clean/lisp: ## Force ASDF to recompile all Lisp sources on next build
@@ -148,20 +168,47 @@ test/unit: ## Run unit tests
 
 ##@ Userland
 
-.PHONY: userland
-userland: build/hello.elf ## Compile userland programs
+# Cross-compiler selection per arch (prefer elf toolchains, fall back to linux-gnu)
+CC_x86_64  ?= $(or $(shell command -v x86_64-elf-gcc 2>/dev/null), \
+                   $(shell command -v x86_64-linux-gnu-gcc 2>/dev/null), \
+                   gcc)
+CC_i386    ?= $(or $(shell command -v i686-elf-gcc 2>/dev/null), \
+                   $(shell command -v i686-linux-gnu-gcc 2>/dev/null), \
+                   gcc -m32)
+CC_aarch64 ?= $(or $(shell command -v aarch64-elf-gcc 2>/dev/null), \
+                   $(shell command -v aarch64-linux-gnu-gcc 2>/dev/null))
 
-build/hello.elf: src/userland/hello.c src/userland/hello.ld
+USERLAND_CFLAGS := -ffreestanding -nostdlib -static -O2
+
+.PHONY: userland
+userland: build/hello-x86_64.elf build/hello-i386.elf build/hello-aarch64.elf \
+          ## Compile userland programs for all architectures
+
+build/hello-x86_64.elf: src/userland/hello.c src/userland/hello-x86_64.ld
 	mkdir -p build
-	x86_64-elf-gcc -ffreestanding -nostdlib -static -O2 \
-	    -T src/userland/hello.ld \
-	    -o build/hello.elf \
-	    src/userland/hello.c 2>/dev/null || \
-	gcc -ffreestanding -nostdlib -static -O2 \
-	    -T src/userland/hello.ld \
-	    -o build/hello.elf \
-	    src/userland/hello.c
-	@echo "[ecclesia] Compiled hello.elf ($$(wc -c < build/hello.elf) bytes)"
+	$(CC_x86_64) $(USERLAND_CFLAGS) \
+	    -T src/userland/hello-x86_64.ld \
+	    -o $@ $<
+	@echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)"
+
+build/hello-i386.elf: src/userland/hello.c src/userland/hello-i386.ld
+	mkdir -p build
+	$(CC_i386) $(USERLAND_CFLAGS) \
+	    -T src/userland/hello-i386.ld \
+	    -o $@ $<
+	@echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)"
+
+build/hello-aarch64.elf: src/userland/hello.c src/userland/hello-aarch64.ld
+	mkdir -p build
+	@if [ -z "$(CC_aarch64)" ]; then \
+	    echo "[ecclesia] Skipping aarch64 userland — no cross-compiler found"; \
+	    echo "[ecclesia] Run 'make setup/toolchain' to install gcc-aarch64-linux-gnu"; \
+	else \
+	    $(CC_aarch64) $(USERLAND_CFLAGS) \
+	        -T src/userland/hello-aarch64.ld \
+	        -o $@ $< && \
+	    echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)"; \
+	fi
 
 ##@ Utilities
 

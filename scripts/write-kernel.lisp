@@ -91,7 +91,7 @@
 
            ;; ── Load ELF binary if available ─────────────────────────────
            ;; Sector 18+ (after 1 MBR + 8 Stage2 + 8 kernel = sector 17)
-           (let* ((elf-path "build/hello.elf")
+           (let* ((elf-path (format nil "build/hello-~a.elf" target-arch))
                   (elf-bytes (when (probe-file elf-path)
                                (with-open-file (f elf-path
                                                   :element-type '(unsigned-byte 8))

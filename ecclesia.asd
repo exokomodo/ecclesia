@@ -11,17 +11,25 @@
       :components ((:file "vga")))
      (:module "assembler"
       :components ((:file "assembler")
-                   (:file "x86_64")))
+                   (:file "x86_64")
+                   (:file "aarch64")))
      (:module "boot"
       :components ((:file "bootloader-x86_64")
                    (:file "stage2-x86_base")
                    (:file "stage2-x86_64")
-                   (:file "stage2-i386")))
+                   (:file "stage2-i386")
+                   (:file "stage2-aarch64")))
      (:module "kernel"
       :components ((:file "interface")
                    (:file "x86_base")
                    (:file "x86_64")
-                   (:file "i386")))
+                   (:file "i386")
+                   (:module "board"
+                    :components ((:file "interface")
+                                 (:file "qemu-virt")
+                                 (:file "raspi4b")
+                                 (:file "raspi3b")))
+                   (:file "aarch64")))
      (:file "main")))))
 
 (defsystem ecclesia/test

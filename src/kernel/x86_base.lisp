@@ -35,6 +35,11 @@
     (jz   kbd-backspace)
     (jmp  abs kbd-printable)))
 
+;;; ── Prompt print (VGA) ───────────────────────────────────────────────────────
+
+(defmethod ecclesia.kernel:print-prompt-forms ((isa x86-base) str row)
+  (ecclesia.utils:vga-rdi-write str :row row :col 0 :attr #x0a))
+
 ;;; ── Unconditional jump ───────────────────────────────────────────────────────
 ;;; jmp abs emits rel32 in both 32-bit and 64-bit mode.
 

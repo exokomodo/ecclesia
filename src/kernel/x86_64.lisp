@@ -124,6 +124,7 @@
   "Return the x86_64 ISA instance for the :x86_64 build target keyword."
   (make-instance 'x86_64))
 
+
 (defmethod ecclesia.kernel:isa-bits ((isa x86_64))          64)
 (defmethod ecclesia.kernel:isa-origin ((isa x86_64))        #x100000)
 (defmethod ecclesia.kernel:isa-stack-pointer ((isa x86_64)) #x200000)

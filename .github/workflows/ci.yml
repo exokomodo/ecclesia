@@ -33,11 +33,12 @@ jobs:
         run: |
           make build
 
-      - name: Upload build artifacts
+      - name: Upload image
         uses: actions/upload-artifact@v7
         with:
           name: ecclesia-${{ matrix.target-arch }}
-          path: ecclesia-${{ matrix.target-arch }}.img
+          path: build/*
+          compression-level: 9 # maximum compression
 
       - name: Unit Tests
         run: |

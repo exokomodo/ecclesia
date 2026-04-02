@@ -71,6 +71,7 @@
    #:*boot-message*
    #:*stage2*
    #:*stage2-i386*
+      #:*stage2-aarch64*
    #:stage2-size
    #:page-table-forms
    #:long-mode-entry-forms))
@@ -111,7 +112,8 @@
    #:discard-char-forms
    ;; Assembler meta-generics
    #:asm-prelude-forms
-   #:unconditional-jump-forms))
+   #:unconditional-jump-forms
+   #:print-prompt-forms))
 
 (defpackage #:ecclesia.kernel.x86-base
   (:use #:cl
@@ -133,14 +135,37 @@
         #:ecclesia.utils)
   (:export #:i386))
 
+(defpackage #:ecclesia.kernel.board
+  (:use #:cl)
+  (:export #:board
+           #:make-board
+           #:board-uart-base
+           #:board-qemu-machine
+           #:board-qemu-cpu
+           #:board-kernel-load-address
+           #:board-stack-top
+           ;; Board classes
+           #:qemu-virt
+           #:raspi4b
+           #:raspi3b))
+
+(defpackage #:ecclesia.kernel.aarch64
+  (:use #:cl
+        #:ecclesia.kernel
+        #:ecclesia.kernel.board
+        #:ecclesia.utils)
+  (:export #:aarch64))
+
 (defpackage #:ecclesia
   (:use #:cl
         #:ecclesia.assembler
         #:ecclesia.boot
         #:ecclesia.kernel
+        #:ecclesia.kernel.board
         #:ecclesia.kernel.x86-base
         #:ecclesia.kernel.x86_64
         #:ecclesia.kernel.i386
+        #:ecclesia.kernel.aarch64
         #:ecclesia.utils)
   (:export
    ;; Kernel image builder — call with an ISA instance or use *build-target*

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Pre-commit hook — runs make check before every commit.
+# Install: make setup/hooks
+set -euo pipefail
+
+# Prefer gmake (GNU make) when available — required on macOS where the
+# system make is BSD make and incompatible with this Makefile.
+if command -v gmake &>/dev/null; then
+  MAKE=gmake
+else
+  MAKE=make
+fi
+
+echo "Running build across all supported architectures..."
+if ! "${MAKE}" build/all; then
+  echo ""
+  echo "❌ Build failed. Fix the issues above before committing."
+  exit 1
+fi
+
+if ! "${MAKE}" test/unit; then
+  echo ""
+  echo "❌ Unit tests failed. Fix the issues above before committing."
+  exit 1
+fi

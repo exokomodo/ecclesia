@@ -6,13 +6,52 @@ SHELL := /bin/bash
 MAKEFLAGS += --no-print-directory
 
 UNAME_S := $(shell uname -s)
+AVAILABLE_ARCHITECTURES := x86_64 aarch64 i386
 
 # Variables
 TARGET_ARCH ?= x86_64
 QEMU        ?= qemu-system-$(TARGET_ARCH)
-FLOPPY      ?= ecclesia-$(TARGET_ARCH).img
 WRITER      ?= scripts/write-kernel.lisp
 
+# Per-arch image name and boot style
+# AArch64 target board.
+# Supported: qemu-virt, raspi4b, raspi3b
+# Default: qemu-virt (safe for QEMU testing without real hardware)
+TARGET_BOARD ?= qemu-virt
+export TARGET_BOARD
+
+# Map TARGET_BOARD → QEMU -machine and -cpu args
+ifeq ($(TARGET_BOARD),qemu-virt)
+  QEMU_BOARD_MACHINE ?= virt
+  QEMU_BOARD_CPU     ?= -cpu cortex-a57
+else ifeq ($(TARGET_BOARD),raspi4b)
+  QEMU_BOARD_MACHINE ?= raspi4b
+  QEMU_BOARD_CPU     ?=
+else ifeq ($(TARGET_BOARD),raspi3b)
+  QEMU_BOARD_MACHINE ?= raspi3b
+  QEMU_BOARD_CPU     ?=
+else
+  $(error Unsupported TARGET_BOARD '$(TARGET_BOARD)'. Supported: qemu-virt raspi4b raspi3b)
+endif
+
+ifeq ($(TARGET_ARCH),aarch64)
+IMAGE             ?= build/ecclesia-$(TARGET_ARCH).bin
+QEMU_MACHINE_ARGS ?= -machine $(QEMU_BOARD_MACHINE) $(QEMU_BOARD_CPU)
+QEMU_MONITOR_ARGS ?= -monitor stdio
+QEMU_BOOT_ARGS    ?= -kernel $(IMAGE)
+else
+IMAGE             ?= build/ecclesia-$(TARGET_ARCH).img
+QEMU_MACHINE_ARGS ?=
+QEMU_MONITOR_ARGS ?= -monitor stdio
+QEMU_BOOT_ARGS    ?= -drive file=$(IMAGE),if=floppy,format=raw
+endif
+
+# Preconditions
+ifeq ($(filter $(TARGET_ARCH),$(AVAILABLE_ARCHITECTURES)),)
+$(error Unsupported TARGET_ARCH '$(TARGET_ARCH)'. Available: $(AVAILABLE_ARCHITECTURES))
+endif
+
+# Default exports
 export TARGET_ARCH
 
 # Source files
@@ -21,7 +60,12 @@ SOURCES   := ecclesia.asd $(wildcard src/*.lisp src/*.asm) $(WRITER)
 ##@ Environment Setup
 
 .PHONY: setup
-setup: setup/sbcl setup/qemu ## Install all development dependencies
+setup: setup/hooks setup/sbcl setup/qemu ## Install all development dependencies
+
+.PHONY: setup/hooks
+setup/hooks: ## Install git hooks
+	ln -sf "$(PWD)/git/hooks/pre-commit" .git/hooks/pre-commit
+	@echo "✅ Git hooks installed"
 
 .PHONY: setup/sbcl
 setup/sbcl: ## Install SBCL
@@ -45,30 +89,37 @@ endif
 
 ##@ Development Tasks
 
-$(FLOPPY): $(SOURCES)
-	echo "[+] Building floppy image..."
-	./$(WRITER)
+$(IMAGE): $(SOURCES)
+	echo "[+] Building image..."
+	mkdir -p $$(dirname $(IMAGE))
+	IMAGE="$(IMAGE)" ./$(WRITER)
 
 .PHONY: boot
 boot: build ## Build and boot in QEMU
 	echo "[+] Launching in QEMU..."
-	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio
+	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) $(QEMU_MONITOR_ARGS) -m 32
 
 .PHONY: boot-once
 boot-once: build ## Boot in QEMU, halt instead of reboot on triple fault
 	echo "[+] Launching in QEMU (no-reboot)..."
-	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio -no-reboot -no-shutdown
+	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) $(QEMU_MONITOR_ARGS) -m 32 -no-reboot -no-shutdown
 
 .PHONY: build
-build: $(FLOPPY) ## Assemble kernel image via SBCL
+build: $(IMAGE) ## Assemble kernel image via SBCL
 	:
 
-.PHONY: clean
-clean: clean/floppy clean/lisp ## Remove build artifacts
+.PHONY: build/all
+build/all:
+	for arch in $(AVAILABLE_ARCHITECTURES); do
+		$(MAKE) build TARGET_ARCH=$${arch} 
+	done
 
-.PHONY: clean/floppy
-clean/floppy:
-	rm -f *.img
+.PHONY: clean
+clean: clean/images clean/lisp ## Remove build artifacts
+
+.PHONY: clean/images
+clean/images:
+	rm -f build/*.img build/*.bin *.img *.bin
 
 .PHONY: clean/lisp
 clean/lisp: ## Force ASDF to recompile all Lisp sources on next build
@@ -77,12 +128,12 @@ clean/lisp: ## Force ASDF to recompile all Lisp sources on next build
 .PHONY: debug
 debug: build ## Build and boot in QEMU with GDB support
 	echo "[+] Launching in QEMU (GDB on :1234)..."
-	$(QEMU) -fda $(FLOPPY) -m 32 -monitor stdio -s -S
+	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) $(QEMU_MONITOR_ARGS) -m 32 -s -S
 
 .PHONY: debug-log
 debug-log: build ## Boot with CPU exception logging to /tmp/qemu.log
 	echo "[+] Launching in QEMU (logging to /tmp/qemu.log)..."
-	$(QEMU) -fda $(FLOPPY) -m 32 -no-reboot -no-shutdown \
+	$(QEMU) $(QEMU_MACHINE_ARGS) $(QEMU_BOOT_ARGS) -m 32 -no-reboot -no-shutdown \
 	        -d int,cpu_reset,cpu -D /tmp/qemu.log 2>/dev/null & \
 	sleep 3 && kill %1 2>/dev/null; \
 	echo "[+] Last entries in /tmp/qemu.log:"; \

@@ -40,7 +40,7 @@
     ,@(isa-entry-prologue-forms isa)
 
     ;; ── Print the prompt ──────────────────────────────────────────────────────
-    ,@(vga-rdi-write *prompt-str* :row *prompt-row* :col 0 :attr #x0a)
+    ,@(print-prompt-forms isa *prompt-str* *prompt-row*)
 
     ;; ── Jump over embedded data ───────────────────────────────────────────────
     ,@(unconditional-jump-forms isa 'kbd-main-loop)

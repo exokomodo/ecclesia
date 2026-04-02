@@ -126,10 +126,7 @@
     ;; Check if col hit terminal width (80)
     (cmp-imm w1 80)
     (bne uart-write-col-done)
-    ;; Wrap: save col-1 (=79, last written position) to uart-prev-col
-    (movx x18 uart-prev-col)
-    (sub-imm w2 w1 1)
-    (strb w2 (mem x18))
+    ;; Wrap: increment row
     (movx x18 uart-row)
     (ldrb w2 (mem x18))
     (add-imm x2 x2 1)
@@ -159,30 +156,16 @@
           (uart-putc-forms 91)   ; [
           (uart-putc-forms 65))) ; A
 
-(defun uart-ansi-cursor-col-forms ()
-  "Emit ESC [ <col+1> G — move cursor to 1-based column.
-   Input: x4 = 0-based column. Uses x5,x6,x7,x8 as scratch."
-  `(;; ESC [
-    ,@(uart-putc-forms 27)
-    ,@(uart-putc-forms 91)
-    ;; x5 = x4 + 1 (1-based column)
-    (add-imm x5 x4 1)
-    ;; x6 = 10 (divisor)
-    (movx x6 10)
-    ;; x7 = x5 / 10 (tens digit)
-    (udiv w7 w5 w6)
-    ;; skip leading zero if tens=0
-    (cmp-imm w7 0)
-    (beq uart-col-ones)
-    (add-imm x8 x7 48)        ; ASCII digit
-    (strb w8 (mem x19))
-    (label uart-col-ones)
-    ;; x8 = x5 - x7*10 (ones digit) via MSUB
-    (msub w8 w7 w6 w5)
-    (add-imm x8 x8 48)
-    (strb w8 (mem x19))
-    ;; 'G'
-    ,@(uart-putc-forms 71)))
+(defun uart-ansi-cursor-end-of-line-forms ()
+  "Emit ESC [ 9 9 9 9 C — move cursor right 9999 positions.
+   The terminal clamps to the actual end of the line, regardless of width."
+  (append (uart-putc-forms 27)   ; ESC
+          (uart-putc-forms 91)   ; [
+          (uart-putc-forms 57)   ; 9
+          (uart-putc-forms 57)   ; 9
+          (uart-putc-forms 57)   ; 9
+          (uart-putc-forms 57)   ; 9
+          (uart-putc-forms 67))) ; C
 
 (defmethod ecclesia.kernel:vga-erase-char-forms ((isa aarch64))
   `(;; Load current column into w1
@@ -205,21 +188,13 @@
     (movx x18 uart-row)
     (strb w2 (mem x18))
 
-    ;; Restore col to uart-prev-col
-    (movx x18 uart-prev-col)
-    (ldrb w1 (mem x18))
-    (movx x18 uart-col)
-    (strb w1 (mem x18))
-
     ;; Emit ESC[A (cursor up)
     ,@(uart-ansi-cursor-up-forms)
 
-    ;; Emit ESC[nG (cursor to column uart-prev-col, 1-based)
-    ;; x4 = x1 (already the column)
-    (add-imm x4 x1 0)
-    ,@(uart-ansi-cursor-col-forms)
+    ;; Move to actual end of line (ESC[9999C — terminal clamps to EOL)
+    ,@(uart-ansi-cursor-end-of-line-forms)
 
-    ;; Erase the char at this position: SP then back
+    ;; Erase the char at end of line: SP then back
     ,@(uart-putc-forms 32)
     ,@(uart-putc-forms 8)
     (b uart-bs-done)
@@ -292,5 +267,5 @@
   (declare (ignore scancode-table-forms))
   `((label uart-col)        (db 0) (db 0) (db 0) (db 0)
     (label uart-row)        (db 0) (db 0) (db 0) (db 0)
-    (label uart-prev-col)   (db 0) (db 0) (db 0) (db 0)
+
     (label uart-prompt-len) (db 0) (db 0) (db 0) (db 0)))

@@ -51,9 +51,6 @@
     (mov  ecx #x400)        ; 4096 / 4 = 1024 dwords
     (rep  movsd)
 
-    ;; Checkpoint K: kernel copied (cyan 'K' at col 5, row 0)
-    (mov  (mem32 #xb800a) #x0b4b)
-
     ;; Enable PAE (CR4 bit 5)
     (mov  eax cr4)
     (or   eax #x20)

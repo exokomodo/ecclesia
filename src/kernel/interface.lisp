@@ -149,6 +149,10 @@
    "Return forms that perform an unconditional jump to LABEL.
     The encoding (near, far, etc.) is ISA-specific."))
 
+(defgeneric isa-supports-elf-loader-p (isa)
+  (:documentation "Return T if this ISA has a static ELF loader implementation.")
+  (:method (isa) nil))
+
 (defgeneric print-prompt-forms (isa str row)
   (:documentation
    "Return forms that print STR as the initial kernel prompt.

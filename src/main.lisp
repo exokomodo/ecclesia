@@ -91,5 +91,15 @@
     ,@(discard-char-forms isa)
     ,@(unconditional-jump-forms isa 'kbd-main-loop)))
 
+;;; ── ELF loader stub ──────────────────────────────────────────────────────────
+
+(defun make-elf-loader (&optional (isa (resolve-build-target))
+                                  (elf-load-addr #x300000))
+  "Return assembly forms for the static ELF loader for ISA.
+   ELF-LOAD-ADDR is the physical address where the ELF binary is pre-loaded.
+   Returns NIL if the ISA doesn't support the ELF loader yet."
+  (when (ecclesia.kernel:isa-supports-elf-loader-p isa)
+    (ecclesia.loader:load-elf-forms isa elf-load-addr)))
+
 ;;; Eagerly build the kernel image for the default build target.
 (defparameter *kernel-main* (make-kernel-main))

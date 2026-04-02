@@ -146,6 +146,23 @@ test: test/unit ## Run tests
 test/unit: ## Run unit tests
 	./scripts/run-tests.lisp
 
+##@ Userland
+
+.PHONY: userland
+userland: build/hello.elf ## Compile userland programs
+
+build/hello.elf: src/userland/hello.c src/userland/hello.ld
+	mkdir -p build
+	x86_64-elf-gcc -ffreestanding -nostdlib -static -O2 \
+	    -T src/userland/hello.ld \
+	    -o build/hello.elf \
+	    src/userland/hello.c 2>/dev/null || \
+	gcc -ffreestanding -nostdlib -static -O2 \
+	    -T src/userland/hello.ld \
+	    -o build/hello.elf \
+	    src/userland/hello.c
+	@echo "[ecclesia] Compiled hello.elf ($$(wc -c < build/hello.elf) bytes)"
+
 ##@ Utilities
 
 .PHONY: help

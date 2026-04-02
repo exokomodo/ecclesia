@@ -161,6 +161,8 @@
   "Pop and discard the saved ASCII char from the stack."
   '((pop-reg rax)))
 
+(defmethod ecclesia.kernel:isa-supports-elf-loader-p ((isa x86_64)) t)
+
 (defmethod ecclesia.kernel:asm-prelude-forms ((isa x86_64))
   "x86_64 assembler prelude: 64-bit mode declaration and load origin."
   `((bits ,(ecclesia.kernel:isa-bits isa))

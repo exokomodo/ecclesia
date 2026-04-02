@@ -14,9 +14,12 @@ QEMU        ?= qemu-system-$(TARGET_ARCH)
 WRITER      ?= scripts/write-kernel.lisp
 
 # Per-arch image name and boot style
+# AArch64 target board — raspi4b for Raspberry Pi 4, virt for generic QEMU
+AARCH64_BOARD ?= raspi4b
+
 ifeq ($(TARGET_ARCH),aarch64)
 IMAGE             ?= build/ecclesia-$(TARGET_ARCH).bin
-QEMU_MACHINE_ARGS ?= -machine virt -cpu cortex-a57
+QEMU_MACHINE_ARGS ?= -machine $(AARCH64_BOARD)
 QEMU_MONITOR_ARGS ?= -monitor stdio
 QEMU_BOOT_ARGS    ?= -kernel $(IMAGE)
 else

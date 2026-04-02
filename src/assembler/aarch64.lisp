@@ -361,6 +361,20 @@
                            (ash (logand rel #x7ffff) 5))))
       (push-u32-le buf enc))))
 
+;;; CMP-REG Wn, Wm — compare registers (SUBS WZR, Wn, Wm)
+;;; Encoding: 0 1101011 00 0 Rm 000000 Rn 11111
+
+(register-instruction 'cmp-reg
+  (lambda (args mode) (declare (ignore args mode)) 4)
+  (lambda (args labels origin buf mode)
+    (declare (ignore labels origin mode))
+    (let* ((rn  (enc-r32 (first args)))
+           (rm  (enc-r32 (second args)))
+           (enc (logior #x6B00001F
+                        (ash rm 16)
+                        (ash rn 5))))
+      (push-u32-le buf enc))))
+
 ;;; CMP-IMM Wn, #imm12 — compare (SUBS WZR, Wn, #imm12)
 ;;; Encoding: 0 1 1 0001011 shift(00) imm12 Rn Rd(WZR=31)
 

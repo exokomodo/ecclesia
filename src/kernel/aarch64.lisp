@@ -126,9 +126,10 @@
     ;; Check if col hit terminal width (80)
     (cmp-imm w1 80)
     (bne uart-write-col-done)
-    ;; Wrap: save current col to uart-prev-col, reset to 0, increment row
+    ;; Wrap: save col-1 (=79, last written position) to uart-prev-col
     (movx x18 uart-prev-col)
-    (strb w1 (mem x18))          ; save col (=80) as prev marker
+    (sub-imm w2 w1 1)
+    (strb w2 (mem x18))
     (movx x18 uart-row)
     (ldrb w2 (mem x18))
     (add-imm x2 x2 1)
@@ -190,11 +191,14 @@
     (cmp-imm w1 0)
     (bne uart-bs-simple)     ; col > 0: simple backspace
 
-    ;; col = 0: check row — if row = 0, nothing to do
+    ;; col = 0: check row — if row = 0, nothing to do (prompt protection)
     (movx x18 uart-row)
     (ldrb w2 (mem x18))
     (cmp-imm w2 0)
     (beq uart-bs-done)
+
+    ;; Also guard row 0: if row=0 and col <= prompt length, stop
+    ;; (col=0 here, and row>0, so we're safe to go up)
 
     ;; Move up: decrement row
     (sub-imm w2 w2 1)
@@ -221,7 +225,18 @@
     (b uart-bs-done)
 
     ;; Simple case: col > 0
+    ;; But on row 0, don't go below prompt length
     (label uart-bs-simple)
+    (movx x18 uart-row)
+    (ldrb w3 (mem x18))
+    (cmp-imm w3 0)
+    (bne uart-bs-do)            ; not row 0, always allow
+    ;; row 0: check col > prompt-len
+    (movx x18 uart-prompt-len)
+    (ldrb w3 (mem x18))
+    (cmp-reg w1 w3)
+    (bls uart-bs-done)          ; col <= prompt-len, refuse
+    (label uart-bs-do)
     (sub-imm w1 w1 1)
     (movx x18 uart-col)
     (strb w1 (mem x18))
@@ -257,9 +272,11 @@
 (defmethod ecclesia.kernel:print-prompt-forms ((isa aarch64) str row)
   (declare (ignore row))
   (append (uart-puts-forms str)
-          ;; Reset column counter to length of prompt string
+          ;; Set uart-col and uart-prompt-len to length of prompt string
           `((movx x18 uart-col)
             (movx x1 ,(length str))
+            (strb w1 (mem x18))
+            (movx x18 uart-prompt-len)
             (strb w1 (mem x18)))))
 
 ;;; unconditional-jump-forms → AArch64 B label
@@ -273,6 +290,7 @@
 ;;; Each label gets 4 bytes to maintain alignment.
 (defmethod ecclesia.kernel:embedded-data-forms ((isa aarch64) scancode-table-forms)
   (declare (ignore scancode-table-forms))
-  `((label uart-col)      (db 0) (db 0) (db 0) (db 0)
-    (label uart-row)      (db 0) (db 0) (db 0) (db 0)
-    (label uart-prev-col) (db 0) (db 0) (db 0) (db 0)))
+  `((label uart-col)        (db 0) (db 0) (db 0) (db 0)
+    (label uart-row)        (db 0) (db 0) (db 0) (db 0)
+    (label uart-prev-col)   (db 0) (db 0) (db 0) (db 0)
+    (label uart-prompt-len) (db 0) (db 0) (db 0) (db 0)))

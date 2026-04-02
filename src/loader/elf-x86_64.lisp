@@ -79,11 +79,14 @@
     (mem-load64 rax rsi ,+elf64-e-entry+)
     (jmp-reg rax)
 
-    ;; ── Bad magic: write "ELF?" in red at known VGA addresses and halt ────
-    ;; Row 7 = offset 7*80*2 = 1120 = 0x460 from 0xB8000 → 0xB8460
+    ;; ── Bad magic: write "ELF?" in red on VGA row 7 then resume keyboard ──
+    ;; Must use register-indirect: in 64-bit mode, MOV [imm32],imm is RIP-relative.
+    ;; Row 7 col 0 = 0xB8000 + 7*80*2 = 0xB8460
     (label elf-bad-magic)
-    (mov (mem32 #xb8460) #x0c45)  ; 'E' red
-    (mov (mem32 #xb8462) #x0c4c)  ; 'L' red
-    (mov (mem32 #xb8464) #x0c46)  ; 'F' red
-    (mov (mem32 #xb8466) #x0c3f)  ; '?' red
-    (hlt)))
+    (mov rdi #xb8460)             ; absolute VGA address in register
+    (mov-rdi-word 0 #x0c45)      ; 'E' red  (byte offset 0)
+    (mov-rdi-word 2 #x0c4c)      ; 'L' red  (byte offset 2)
+    (mov-rdi-word 4 #x0c46)      ; 'F' red  (byte offset 4)
+    (mov-rdi-word 6 #x0c3f)      ; '?' red  (byte offset 6)
+    ;; Return to keyboard loop — don't hlt, keep the OS alive
+    (jmp abs kbd-main-loop)))

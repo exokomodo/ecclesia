@@ -72,7 +72,7 @@ endif
 $(IMAGE): $(SOURCES)
 	echo "[+] Building image..."
 	mkdir -p $$(dirname $(IMAGE))
-	./$(WRITER)
+	IMAGE="$(IMAGE)" ./$(WRITER)
 
 .PHONY: boot
 boot: build ## Build and boot in QEMU
@@ -91,7 +91,7 @@ build: $(IMAGE) ## Assemble kernel image via SBCL
 .PHONY: build/all
 build/all:
 	for arch in $(AVAILABLE_ARCHITECTURES); do
-		TARGET_ARCH=$${arch} $(MAKE) build
+		$(MAKE) build TARGET_ARCH=$${arch} 
 	done
 
 .PHONY: clean
@@ -99,7 +99,7 @@ clean: clean/images clean/lisp ## Remove build artifacts
 
 .PHONY: clean/images
 clean/images:
-	rm -f *.img *.bin
+	rm -f build/*.img build/*.bin *.img *.bin
 
 .PHONY: clean/lisp
 clean/lisp: ## Force ASDF to recompile all Lisp sources on next build

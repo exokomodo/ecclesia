@@ -22,6 +22,16 @@
 
 (defconstant +floppy-total-size+ (* 2880 512))  ; standard 1.44MB
 
+(defun output-path-from-env ()
+  "Return the IMAGE environment path or fail if it is unset."
+  (or (sb-ext:posix-getenv "IMAGE")
+      (error "IMAGE environment variable is required")))
+
+(defun ensure-output-directory-exists (output-path)
+  "Create the parent directory for OUTPUT-PATH when needed."
+  (ensure-directories-exist output-path)
+  output-path)
+
 (defun pad-to-sector (bytes)
   "Pad BYTES with zeros to the next 512-byte sector boundary."
   (let* ((len    (length bytes))
@@ -42,7 +52,8 @@
      (format t "[ecclesia] Assembling kernel [aarch64]...~%")
      (setf *kernel-main* (make-kernel-main))
      (let* ((kernel      (assemble *kernel-main*))
-            (output-path "ecclesia-aarch64.bin"))
+          (output-path (ensure-output-directory-exists
+               (output-path-from-env))))
        (format t "[ecclesia] Writing ~a (~d bytes)...~%~%" output-path (length kernel))
        (with-open-file (out output-path
                             :direction :output
@@ -72,7 +83,8 @@
          (setf *kernel-main* (make-kernel-main))
          (let* ((kernel       (pad-to-sector (assemble *kernel-main*)))
                 (content-size (+ +floppy-sector-size+ +stage2-size+ (length kernel)))
-                (output-path  (format nil "ecclesia-~a.img" target-arch)))
+          (output-path  (ensure-output-directory-exists
+                   (output-path-from-env))))
 
            (format t "[ecclesia] Writing ~a (~d bytes / 1.44MB)...~%~%"
                    output-path +floppy-total-size+)

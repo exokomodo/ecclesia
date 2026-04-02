@@ -112,10 +112,8 @@
     (beq kbd-backspace)
     (b kbd-printable)))
 
-;;; vga-write-char-forms → write w0 to UART, track column and row
-;;;
-;;; After writing, increment uart-col.
-;;; If uart-col reaches 80, save it to uart-prev-col, reset to 0, increment uart-row.
+;;; vga-write-char-forms → write w0 to UART, increment column counter.
+;;; Column wraps at 80 (reset to 0). Row tracking deferred to issue #25.
 (defmethod ecclesia.kernel:vga-write-char-forms ((isa aarch64))
   `(;; Write character to UART
     (strb w0 (mem x19))
@@ -123,102 +121,36 @@
     (movx x18 uart-col)
     (ldrb w1 (mem x18))
     (add-imm x1 x1 1)
-    ;; Check if col hit terminal width (80)
+    ;; Wrap at 80
     (cmp-imm w1 80)
     (bne uart-write-col-done)
-    ;; Wrap: increment row
-    (movx x18 uart-row)
-    (ldrb w2 (mem x18))
-    (add-imm x2 x2 1)
-    (strb w2 (mem x18))
     (movx x1 0)
     (label uart-write-col-done)
     (movx x18 uart-col)
     (strb w1 (mem x18))))
 
-;;; vga-erase-char-forms
-;;;
-;;; Two cases:
-;;;   col > 0  → simple BS SP BS
-;;;   col = 0  → we wrapped; go up one row via ANSI ESC[A, then move
-;;;               to column uart-prev-col-at-wrap via BS-chain or ESC[nG
-;;;
-;;; We use ANSI escape sequences:
-;;;   ESC [ A        — cursor up 1 line
-;;;   ESC [ <n> G    — cursor to column n (1-based)
-;;;
-;;; uart-prev-col holds the column value at the last newline/wrap.
-;;; uart-row holds the current row (0 = at or above prompt row, no up allowed).
-
-(defun uart-ansi-cursor-up-forms ()
-  "Emit ESC [ A — cursor up one line."
-  (append (uart-putc-forms 27)   ; ESC
-          (uart-putc-forms 91)   ; [
-          (uart-putc-forms 65))) ; A
-
-(defun uart-ansi-cursor-end-of-line-forms ()
-  "Emit ESC [ 9 9 9 9 C — move cursor right 9999 positions.
-   The terminal clamps to the actual end of the line, regardless of width."
-  (append (uart-putc-forms 27)   ; ESC
-          (uart-putc-forms 91)   ; [
-          (uart-putc-forms 57)   ; 9
-          (uart-putc-forms 57)   ; 9
-          (uart-putc-forms 57)   ; 9
-          (uart-putc-forms 57)   ; 9
-          (uart-putc-forms 67))) ; C
+;;; vga-erase-char-forms — simple backspace, stops at prompt boundary.
+;;; Cross-row backspace is deferred to the input buffer module (issue #25).
 
 (defmethod ecclesia.kernel:vga-erase-char-forms ((isa aarch64))
   `(;; Load current column into w1
     (movx x18 uart-col)
     (ldrb w1 (mem x18))
-    (cmp-imm w1 0)
-    (bne uart-bs-simple)     ; col > 0: simple backspace
-
-    ;; col = 0: check row — if row = 0, nothing to do (prompt protection)
-    (movx x18 uart-row)
-    (ldrb w2 (mem x18))
-    (cmp-imm w2 0)
-    (beq uart-bs-done)
-
-    ;; Also guard row 0: if row=0 and col <= prompt length, stop
-    ;; (col=0 here, and row>0, so we're safe to go up)
-
-    ;; Move up: decrement row
-    (sub-imm w2 w2 1)
-    (movx x18 uart-row)
-    (strb w2 (mem x18))
-
-    ;; Emit ESC[A (cursor up)
-    ,@(uart-ansi-cursor-up-forms)
-
-    ;; Move to actual end of line (ESC[9999C — terminal clamps to EOL)
-    ,@(uart-ansi-cursor-end-of-line-forms)
-
-    ;; Erase the char at end of line: SP then back
-    ,@(uart-putc-forms 32)
-    ,@(uart-putc-forms 8)
-    (b uart-bs-done)
-
-    ;; Simple case: col > 0
-    ;; But on row 0, don't go below prompt length
-    (label uart-bs-simple)
-    (movx x18 uart-row)
-    (ldrb w3 (mem x18))
-    (cmp-imm w3 0)
-    (bne uart-bs-do)            ; not row 0, always allow
-    ;; row 0: check col > prompt-len
+    ;; Refuse to go below prompt length (prompt is always on the first line)
     (movx x18 uart-prompt-len)
-    (ldrb w3 (mem x18))
-    (cmp-reg w1 w3)
-    (bls uart-bs-done)          ; col <= prompt-len, refuse
-    (label uart-bs-do)
+    (ldrb w2 (mem x18))
+    (cmp-reg w1 w2)
+    (bls uart-bs-done)          ; col <= prompt-len, stop
+    ;; col = 0: stop (cross-row backspace deferred to issue #25)
+    (cmp-imm w1 0)
+    (beq uart-bs-done)
+    ;; Decrement col and emit BS SP BS
     (sub-imm w1 w1 1)
     (movx x18 uart-col)
     (strb w1 (mem x18))
     ,@(uart-putc-forms 8)
     ,@(uart-putc-forms 32)
     ,@(uart-putc-forms 8)
-
     (label uart-bs-done)))
 
 ;;; vga-offset-forms → reset column on newline detection (not needed for basic echo)
@@ -260,12 +192,8 @@
 
 ;;; embedded-data-forms — 4-byte-aligned data block
 ;;;   uart-col      — current column (0-79)
-;;;   uart-row      — current row relative to prompt (0 = first line)
-;;;   uart-prev-col — column count before the last wrap (for backspace recovery)
-;;; Each label gets 4 bytes to maintain alignment.
+;;; Each label gets 4 bytes to maintain AArch64 instruction alignment.
 (defmethod ecclesia.kernel:embedded-data-forms ((isa aarch64) scancode-table-forms)
   (declare (ignore scancode-table-forms))
   `((label uart-col)        (db 0) (db 0) (db 0) (db 0)
-    (label uart-row)        (db 0) (db 0) (db 0) (db 0)
-
     (label uart-prompt-len) (db 0) (db 0) (db 0) (db 0)))

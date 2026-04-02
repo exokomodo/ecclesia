@@ -16,7 +16,7 @@ WRITER      ?= scripts/write-kernel.lisp
 # Per-arch image name and boot style
 ifeq ($(TARGET_ARCH),aarch64)
 IMAGE             ?= build/ecclesia-$(TARGET_ARCH).bin
-QEMU_MACHINE_ARGS ?= -machine virt
+QEMU_MACHINE_ARGS ?= -machine virt -cpu cortex-a57
 QEMU_MONITOR_ARGS ?= -monitor stdio
 QEMU_BOOT_ARGS    ?= -kernel $(IMAGE)
 else

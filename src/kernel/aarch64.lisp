@@ -153,7 +153,7 @@
 
 ;;; backspace-forms → delegate to vga-erase-char-forms
 (defmethod ecclesia.kernel:backspace-forms ((isa aarch64))
-  (ecclesia.kernel:vga-erase-char-forms (make-instance 'aarch64)))
+  (ecclesia.kernel:vga-erase-char-forms isa))
 
 ;;; save/restore/discard: w0 is never clobbered (no screen-full or VGA offset
 ;;; logic for UART), so these are all noops.
@@ -174,7 +174,9 @@
 (defmethod ecclesia.kernel:unconditional-jump-forms ((isa aarch64) label)
   `((b ,label)))
 
-;;; embedded-data-forms → just the uart-col byte
+;;; embedded-data-forms → uart-col padded to 4-byte alignment
+;;; AArch64 requires all instructions to be 4-byte aligned.
+;;; The (db 0) is 1 byte; pad to 4 bytes so kbd-main-loop is aligned.
 (defmethod ecclesia.kernel:embedded-data-forms ((isa aarch64) scancode-table-forms)
   (declare (ignore scancode-table-forms))
-  `((label uart-col) (db 0)))
+  `((label uart-col) (db 0) (db 0) (db 0) (db 0)))

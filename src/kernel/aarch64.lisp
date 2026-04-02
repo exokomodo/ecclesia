@@ -36,7 +36,7 @@
     ,@(uart-puts-forms "Ecclesia OS")
     ,@(uart-putc-forms 13)   ; CR
     ,@(uart-putc-forms 10)   ; LF
-    ,@(uart-puts-forms "[ OK ] AArch64 kernel loaded")
+    ,@(uart-puts-forms "[ OK ] kernel loaded")
     ,@(uart-putc-forms 13)
     ,@(uart-putc-forms 10)))
 

@@ -93,15 +93,13 @@ ifeq ($(UNAME_S),Linux)
 	sudo apt update && sudo apt install -y \
 	    gcc \
 	    gcc-x86-64-linux-gnu \
-	    gcc-i686-linux-gnu \
 	    gcc-aarch64-linux-gnu \
 	    binutils-x86-64-linux-gnu \
-	    binutils-i686-linux-gnu \
 	    binutils-aarch64-linux-gnu
 	@echo "✅ Cross-compilers installed"
 else ifeq ($(UNAME_S),Darwin)
-	brew install x86_64-elf-gcc i686-elf-gcc aarch64-elf-gcc 2>/dev/null || \
-	brew install x86_64-elf-binutils i686-elf-binutils aarch64-elf-binutils
+	brew install x86_64-elf-gcc aarch64-elf-gcc 2>/dev/null || \
+	brew install x86_64-elf-binutils aarch64-elf-binutils
 	@echo "✅ Cross-compilers installed (via Homebrew)"
 else
 	$(error "Unsupported OS: $(UNAME_S). Please install cross-compilers manually.")
@@ -176,9 +174,6 @@ test/unit: ## Run unit tests
 CC_x86_64  ?= $(or $(shell command -v x86_64-elf-gcc 2>/dev/null), \
                    $(shell command -v x86_64-linux-gnu-gcc 2>/dev/null), \
                    gcc)
-CC_i386    ?= $(or $(shell command -v i686-elf-gcc 2>/dev/null), \
-                   $(shell command -v i686-linux-gnu-gcc 2>/dev/null), \
-                   gcc -m32)
 CC_aarch64 ?= $(or $(shell command -v aarch64-elf-gcc 2>/dev/null), \
                    $(shell command -v aarch64-linux-gnu-gcc 2>/dev/null))
 
@@ -188,8 +183,7 @@ USERLAND_CFLAGS := -ffreestanding -nostdlib -static -O2
 userland: build/hello-$(TARGET_ARCH).elf ## Compile userland for current TARGET_ARCH
 
 .PHONY: userland/all
-userland/all: build/hello-x86_64.elf build/hello-i386.elf build/hello-aarch64.elf \
-              ## Compile userland programs for all architectures
+userland/all: build/hello-x86_64.elf build/hello-aarch64.elf ## Compile userland programs for all architectures
 
 build/hello-x86_64.elf: src/userland/hello/hello.c src/userland/hello/hello-x86_64.ld
 	mkdir -p build
@@ -204,13 +198,10 @@ build/hello-x86_64.elf: src/userland/hello/hello.c src/userland/hello/hello-x86_
 	fi
 	@test -f $@ && echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)" || true
 
-build/hello-i386.elf: src/userland/hello/hello.c src/userland/hello/hello-i386.ld
-	mkdir -p build
-	@if ! $(CC_i386) $(USERLAND_CFLAGS) -T src/userland/hello/hello-i386.ld -o $@ $< 2>/dev/null; then \
-	    echo "[ecclesia] Skipping i386 userland — no suitable cross-compiler"; \
-	    echo "[ecclesia] Run 'make setup/toolchain' to install i686-linux-gnu-gcc"; \
-	fi
-	@test -f $@ && echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)" || true
+
+build/hello-i386.elf:
+	@echo "[ecclesia] Skipping i386 userland — no ELF loader for i386 in this branch"
+	@echo "[ecclesia] Run 'make setup/toolchain' to install i686-linux-gnu-gcc"
 
 build/hello-aarch64.elf: src/userland/hello/hello.c src/userland/hello/hello-aarch64.ld
 	mkdir -p build

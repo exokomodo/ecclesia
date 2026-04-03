@@ -32,8 +32,7 @@
                    (:file "aarch64")))
      (:module "loader"
       :components ((:file "elf")
-                   (:file "elf-x86_64")
-                   (:file "elf-i386")))
+                   (:file "elf-x86_64")))
      (:file "main")))))
 
 (defsystem ecclesia/test

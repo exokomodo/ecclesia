@@ -5,7 +5,6 @@
 ;;;; ecclesia.boot          — boot code
 ;;;; ecclesia.kernel        — ISA-agnostic kernel generics
 ;;;; ecclesia.kernel.x86_64 — x86_64 implementations of the kernel generics
-;;;; ecclesia.kernel.i386   — i386 (32-bit) implementations of the kernel generics
 ;;;; ecclesia               — kernel image definitions (*kernel-main*, etc.)
 
 (defpackage #:ecclesia.utils
@@ -161,8 +160,7 @@
   (:use #:cl
         #:ecclesia.assembler
         #:ecclesia.kernel
-        #:ecclesia.kernel.x86-base
-        #:ecclesia.kernel.i386)
+        #:ecclesia.kernel.x86-base)
   (:export #:load-elf-forms
            #:+elf-magic+
            #:+elf64-e-entry+

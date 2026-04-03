@@ -575,16 +575,6 @@
                (push-byte buf (logior #xe0 (enc *r64* r))))
         (error "JMP-REG requires r64, got ~a" r))))
 
-;;; CALL r32 — indirect call in 32-bit mode (FF /2, no REX)
-(definsn call-reg32 (args mode)
-         2
-         (args labels origin buf mode)
-  (let ((r (first args)))
-    (if (r32-p r)
-        (progn (push-byte buf #xff)
-               (push-byte buf (logior #xd0 (enc *r32* r))))
-        (error "CALL-REG32 requires r32, got ~a" r))))
-
 ;;; CALL r64 — indirect call via register (FF /2)
 (definsn call-reg (args mode)
          2
@@ -674,10 +664,6 @@
        (push-byte buf #x8b)
        (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) (enc *r64* base)))
        (push-u32 buf off))
-      ((and (r32-p dst) (r32-p base))
-       (push-byte buf #x8b)
-       (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) (enc *r32* base)))
-       (push-u32 buf off))
       (t (error "Unknown MEM-LOAD32 form: ~a ~a" dst base)))))
 
 (definsn mem-load64 (args mode)
@@ -699,6 +685,5 @@
         (base (second args))
         (off  (third args)))
     (push-byte buf #x0f) (push-byte buf #xb7)
-    (let ((base-enc (if (r64-p base) (enc *r64* base) (enc *r32* base))))
-      (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) base-enc)))
+    (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) (enc *r64* base)))
     (push-u32 buf off)))

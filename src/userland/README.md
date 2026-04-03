@@ -40,7 +40,6 @@ Each program lives in its own folder:
 src/userland/<name>/
   <name>.c          — C source (no libc, no stdlib)
   <name>-x86_64.ld  — linker script for x86-64
-  <name>-i386.ld    — linker script for i386
   <name>-aarch64.ld — linker script for AArch64
 ```
 
@@ -51,7 +50,6 @@ The linker script defines where the program loads in virtual memory. Each arch h
 | ISA      | Load address | Rationale                              |
 |----------|-------------|----------------------------------------|
 | x86_64   | `0x400000`  | 4MB — above kernel at `0x100000`       |
-| i386     | `0x400000`  | 4MB — above kernel at `0x20000`        |
 | AArch64  | `0x41000000`| Just above kernel at `0x40000000`      |
 
 The load address must be within the kernel's identity-mapped page tables. For x86_64, Stage 2 maps the first 16MB (0x0 to 0xFFFFFF), so `0x400000` is safely within range.
@@ -132,8 +130,8 @@ Also add your target to `userland` and `userland/all`:
 ```makefile
 userland: build/hello-$(TARGET_ARCH).elf build/<name>-$(TARGET_ARCH).elf
 
-userland/all: build/hello-x86_64.elf build/hello-i386.elf build/hello-aarch64.elf \
-              build/<name>-x86_64.elf build/<name>-i386.elf build/<name>-aarch64.elf
+userland/all: build/hello-x86_64.elf build/hello-aarch64.elf \
+              build/<name>-x86_64.elf build/<name>-aarch64.elf
 ```
 
 ### Choosing Which ELF to Load

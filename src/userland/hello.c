@@ -14,6 +14,5 @@ void _start(void) {
     for (int i = 0; msg[i]; i++) {
         vga[i] = VGA_ATTR | (unsigned char)msg[i];
     }
-    /* Spin — kernel will eventually provide a return mechanism via #25 */
-    while (1) {}
+    /* Return to kernel — loader uses CALL so RET returns to kbd-main-loop */
 }

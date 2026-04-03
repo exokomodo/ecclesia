@@ -569,6 +569,16 @@
                (push-byte buf (logior #xe0 (enc *r64* r))))
         (error "JMP-REG requires r64, got ~a" r))))
 
+;;; CALL r64 — indirect call via register (FF /2)
+(definsn call-reg (args mode)
+         2
+         (args labels origin buf mode)
+  (let ((r (first args)))
+    (if (r64-p r)
+        (progn (push-byte buf #xff)
+               (push-byte buf (logior #xd0 (enc *r64* r))))
+        (error "CALL-REG requires r64, got ~a" r))))
+
 ;;; MOV r64, r64  — already handled by mov, but ADD r64, r64 is missing:
 ;;; ADD r64, r64  →  REX.W 0x01 /r  (already in add definsn)
 ;;; SUB r64, r64  →  REX.W 0x29 /r

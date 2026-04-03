@@ -74,10 +74,12 @@
     (dec ecx)
     (jmp abs elf-ph-loop)
 
-    ;; ── Jump to entry point ───────────────────────────────────────────────
+    ;; ── Call entry point (CALL so _start can RET back here) ──────────────
     (label elf-jump-entry)
     (mem-load64 rax rsi ,+elf64-e-entry+)
-    (jmp-reg rax)
+    (call-reg rax)
+    ;; _start returned — resume keyboard loop
+    (jmp abs kbd-main-loop)
 
     ;; ── Bad magic: write "ELF?" in red on VGA row 7 then resume keyboard ──
     ;; Must use register-indirect: in 64-bit mode, MOV [imm32],imm is RIP-relative.

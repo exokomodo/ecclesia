@@ -70,20 +70,27 @@
     (assert= t (> (count-if #'plusp (subseq img +kernel-offset+ (+ +kernel-offset+ 512))) 0)
              "Kernel area at sector 10 contains non-zero bytes")
 
-    ;; ── ELF slot: either zeros (no ELF) or valid ELF magic ───────────────
-    (let ((elf-first (aref img +elf-offset+)))
-      (if (zerop elf-first)
-          (format t "  INFO  ELF slot at sector 18 is empty (build with 'make userland' to embed)~%")
-          (progn
-            (assert= +elf-magic+ elf-first
-                     "ELF slot byte 0 is 0x7F (ELF magic byte 0)")
-            (assert= (char-code #\E) (aref img (+ +elf-offset+ 1))
-                     "ELF slot byte 1 is 'E'")
-            (assert= (char-code #\L) (aref img (+ +elf-offset+ 2))
-                     "ELF slot byte 2 is 'L'")
-            (assert= (char-code #\F) (aref img (+ +elf-offset+ 3))
-                     "ELF slot byte 3 is 'F'")
-            (format t "  INFO  ELF embedded: ~d bytes~%"
-                    (count-if #'plusp (subseq img +elf-offset+ (+ +elf-offset+ (* 16 +sector+))))))))
+    ;; ── ELF slot: must contain valid ELF magic when userland was built ────
+    ;; Fail hard when the ELF is absent AND we're on a system that should
+    ;; have a cross-compiler (i.e. the userland target succeeded).
+    (let* ((elf-first (aref img +elf-offset+))
+           (elf-present (= elf-first +elf-magic+))
+           (arch (or (sb-ext:posix-getenv "TARGET_ARCH") "x86_64"))
+           (elf-path (format nil "build/hello-~a.elf" arch))
+           (elf-built (probe-file elf-path)))
+      (cond
+        (elf-present
+         (assert= +elf-magic+ elf-first "ELF slot byte 0 is 0x7F")
+         (assert= (char-code #\E) (aref img (+ +elf-offset+ 1)) "ELF slot byte 1 is 'E'")
+         (assert= (char-code #\L) (aref img (+ +elf-offset+ 2)) "ELF slot byte 2 is 'L'")
+         (assert= (char-code #\F) (aref img (+ +elf-offset+ 3)) "ELF slot byte 3 is 'F'")
+         (format t "  INFO  ELF embedded: ~d bytes~%"
+                 (count-if #'plusp (subseq img +elf-offset+ (+ +elf-offset+ (* 16 +sector+))))))
+        (elf-built
+         ;; ELF was built but not embedded — hard fail
+         (assert= +elf-magic+ elf-first
+                  "ELF slot byte 0 is 0x7F (ELF was built but not embedded — rebuild image)"))
+        (t
+         (format t "  SKIP  ELF slot empty — no cross-compiler available (run 'make setup/toolchain')~%"))))
 
     (format t "~%All floppy layout tests passed.~%")))

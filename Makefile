@@ -191,33 +191,33 @@ userland: build/hello-$(TARGET_ARCH).elf ## Compile userland for current TARGET_
 userland/all: build/hello-x86_64.elf build/hello-i386.elf build/hello-aarch64.elf \
               ## Compile userland programs for all architectures
 
-build/hello-x86_64.elf: src/userland/hello.c src/userland/hello-x86_64.ld
+build/hello-x86_64.elf: src/userland/hello/hello.c src/userland/hello/hello-x86_64.ld
 	mkdir -p build
 	@if [ -z "$(CC_x86_64)" ] || ! $(CC_x86_64) --target-help 2>&1 | grep -q x86_64 2>/dev/null; then \
-	    if ! $(CC_x86_64) -ffreestanding -nostdlib -static -O2 -T src/userland/hello-x86_64.ld -o $@ $< 2>/dev/null; then \
+	    if ! $(CC_x86_64) -ffreestanding -nostdlib -static -O2 -T src/userland/hello/hello-x86_64.ld -o $@ $< 2>/dev/null; then \
 	        echo "[ecclesia] Skipping x86_64 userland — no suitable cross-compiler"; \
 	        echo "[ecclesia] Run 'make setup/toolchain' to install x86_64-linux-gnu-gcc"; \
 	        exit 0; \
 	    fi; \
 	else \
-	    $(CC_x86_64) $(USERLAND_CFLAGS) -T src/userland/hello-x86_64.ld -o $@ $<; \
+	    $(CC_x86_64) $(USERLAND_CFLAGS) -T src/userland/hello/hello-x86_64.ld -o $@ $<; \
 	fi
 	@test -f $@ && echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)" || true
 
-build/hello-i386.elf: src/userland/hello.c src/userland/hello-i386.ld
+build/hello-i386.elf: src/userland/hello/hello.c src/userland/hello/hello-i386.ld
 	mkdir -p build
-	@if ! $(CC_i386) $(USERLAND_CFLAGS) -T src/userland/hello-i386.ld -o $@ $< 2>/dev/null; then \
+	@if ! $(CC_i386) $(USERLAND_CFLAGS) -T src/userland/hello/hello-i386.ld -o $@ $< 2>/dev/null; then \
 	    echo "[ecclesia] Skipping i386 userland — no suitable cross-compiler"; \
 	    echo "[ecclesia] Run 'make setup/toolchain' to install i686-linux-gnu-gcc"; \
 	fi
 	@test -f $@ && echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)" || true
 
-build/hello-aarch64.elf: src/userland/hello.c src/userland/hello-aarch64.ld
+build/hello-aarch64.elf: src/userland/hello/hello.c src/userland/hello/hello-aarch64.ld
 	mkdir -p build
 	@if [ -z "$(CC_aarch64)" ]; then \
 	    echo "[ecclesia] Skipping aarch64 userland — no cross-compiler found"; \
 	    echo "[ecclesia] Run 'make setup/toolchain' to install gcc-aarch64-linux-gnu"; \
-	elif ! $(CC_aarch64) $(USERLAND_CFLAGS) -T src/userland/hello-aarch64.ld -o $@ $< 2>/dev/null; then \
+	elif ! $(CC_aarch64) $(USERLAND_CFLAGS) -T src/userland/hello/hello-aarch64.ld -o $@ $< 2>/dev/null; then \
 	    echo "[ecclesia] Skipping aarch64 userland — compilation failed"; \
 	fi
 	@test -f $@ && echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)" || true

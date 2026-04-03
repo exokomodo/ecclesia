@@ -36,6 +36,8 @@
     (mem-load64 rbx rsi ,+elf64-e-phoff+)
     (add rbx rsi)
 
+
+
     ;; ── Walk program headers ─────────────────────────────────────────────
     (label elf-ph-loop)
     (cmp ecx 0)
@@ -57,6 +59,8 @@
     (mem-load64 rcx rbx ,+ph64-p-filesz+)
     ;; RSI = ELF base + p_offset (source)
     (mem-load64 rdx rbx ,+ph64-p-offset+)
+    (mov-r64 rsi rdx)
+    ;; RSI = ELF base + RDX (p_offset)
     (mov-r64 rsi rdx)
     (add-imm64 rsi ,elf-load-addr)
     ;; Save filesz for BSS calculation
@@ -82,7 +86,7 @@
 
     ;; ── Advance to next PH entry (size = 56 bytes for ELF64) ─────────────
     (label elf-ph-next)
-    (mov rsi ,elf-load-addr)      ; restore RSI (clobbered by rep movsb)
+    (mov rsi ,elf-load-addr)
     (add-imm64 rbx 56)
     (dec ecx)
     (jmp abs elf-ph-loop)

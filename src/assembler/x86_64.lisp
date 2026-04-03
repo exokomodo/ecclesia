@@ -661,8 +661,8 @@
       (t (error "Unknown MEM-LOAD32 form")))))
 
 (definsn mem-load64 (args mode)
-  ;; (mem-load64 dst reg off) → MOV dst, QWORD PTR [reg+off]
-  8
+  ;; (mem-load64 dst reg off) → REX.W MOV dst, QWORD PTR [reg+disp32] = 7 bytes
+  7
   (args labels origin buf mode)
   (let ((dst (first args))
         (base (second args))
@@ -672,8 +672,8 @@
     (push-u32 buf off)))
 
 (definsn mem-load16-zx (args mode)
-  ;; (mem-load16-zx dst reg off) → MOVZX dst, WORD PTR [reg+off]
-  8
+  ;; (mem-load16-zx dst reg off) → 0F B7 ModRM disp32 = 7 bytes
+  7
   (args labels origin buf mode)
   (let ((dst (first args))
         (base (second args))

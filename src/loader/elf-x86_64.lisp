@@ -12,7 +12,7 @@
 
 (in-package #:ecclesia.loader)
 
-(defmethod load-elf-forms ((isa ecclesia.kernel.x86-base:x86-base) elf-load-addr)
+(defmethod load-elf-forms ((isa ecclesia.kernel.x86_64:x86_64) elf-load-addr)
   `(;; ── Load ELF base into RSI ────────────────────────────────────────────
     (mov rsi ,elf-load-addr)
 

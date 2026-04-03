@@ -1,7 +1,7 @@
 #!/usr/bin/env -S sbcl --script
 ;;;; scripts/write-kernel.lisp — Ecclesia build script
 ;;;;
-;;;; For x86 targets (x86_64, i386):
+;;;; For x86_64:
 ;;;;   Assembles Stage 1, Stage 2, and the kernel into a bootable 1.44MB floppy image.
 ;;;;   Layout:
 ;;;;     Sector 1     (0x0000): Stage 1 MBR            (512 bytes)
@@ -49,10 +49,7 @@
              +floppy-sector-size+ (length stage1)))
 
     (format t "[ecclesia] Assembling Stage 2 [~a]...~%" target-arch)
-    (let ((stage2 (pad-to-sector
-                   (assemble (ecase arch-keyword
-                               (:x86_64 *stage2*)
-                               (:i386   *stage2-i386*))))))
+    (let ((stage2 (pad-to-sector (assemble *stage2*))))
       (when (> (length stage2) +stage2-size+)
         (error "Stage 2 too large: ~d bytes (max ~d)" (length stage2) +stage2-size+))
 

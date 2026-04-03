@@ -15,13 +15,10 @@
      (:module "boot"
       :components ((:file "bootloader-x86_64")
                    (:file "stage2-x86_base")
-                   (:file "stage2-x86_64")
-                   (:file "stage2-i386")))
+                   (:file "stage2-x86_64")))
      (:module "kernel"
       :components ((:file "interface")
-                   (:file "x86_base")
-                   (:file "x86_64")
-                   (:file "i386")))
+                   (:file "x86_64")))
      (:module "loader"
       :components ((:file "elf")
                    (:file "elf-x86_64")))

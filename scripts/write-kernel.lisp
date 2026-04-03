@@ -92,6 +92,8 @@
            ;; ── Load ELF binary if available ─────────────────────────────
            ;; Sector 18+ (after 1 MBR + 8 Stage2 + 8 kernel = sector 17)
            (let* ((elf-path (format nil "build/hello-~a.elf" target-arch))
+                  (_ (format t "[ecclesia] ELF path: ~a -> ~a~%"
+                             elf-path (if (probe-file elf-path) "FOUND" "NOT FOUND")))
                   (elf-bytes (when (probe-file elf-path)
                                (with-open-file (f elf-path
                                                   :element-type '(unsigned-byte 8))

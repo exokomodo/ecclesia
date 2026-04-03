@@ -63,6 +63,7 @@
    #:boot-message-db-forms
    #:*boot-message*
    #:*stage2*
+   #:build-stage2
    #:stage2-size
    #:page-table-forms
    #:long-mode-entry-forms))

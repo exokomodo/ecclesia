@@ -1,11 +1,12 @@
-;;;; stage2-x86_64.lisp — Stage 2: 32-bit PM → 64-bit long mode, print status, halt
+;;;; stage2-x86_64.lisp — Stage 2: real mode → 64-bit long mode → ELF _start
 ;;;;
 ;;;; Steps:
-;;;;   1. Extend GDT with a 64-bit code segment (L=1)
-;;;;   2. Write identity-mapped page tables into 0x1000–0x3FFF (16MB)
-;;;;   3. Enable PAE, load CR3, set EFER.LME, enable paging
-;;;;   4. Far jump to 64-bit code segment
-;;;;   5. Print [  OK  ] status lines via vga.lisp helpers
+;;;;   1. Load ELF sectors from floppy into 0x30000 (real mode)
+;;;;   2. A20 enable, GDT load, enter 32-bit PM
+;;;;   3. Copy kernel placeholder + ELF into high memory
+;;;;   4. Identity-map 16MB page tables
+;;;;   5. Enable PAE, EFER.LME, paging → far jump to 64-bit
+;;;;   6. Parse ELF64 header, copy PT_LOAD segments, jump to e_entry
 
 (in-package #:ecclesia.boot)
 
@@ -44,15 +45,7 @@
 
 (defun long-mode-entry-forms ()
   "Enable PAE, load CR3, set EFER.LME, enable paging, then far jump to 64-bit."
-  `(;; ── Copy kernel from 0x20000 → 0x100000 (in 32-bit PM, full addressing) ──
-    ;; Stage 1 loaded 8 sectors (4096 bytes) at physical 0x20000.
-    (mov  esi #x20000)
-    (mov  edi #x100000)
-    (mov  ecx #x400)        ; 4096 / 4 = 1024 dwords
-    (rep  movsd)
-
-
-    ;; ── Copy ELF binary from 0x30000 → 0x300000 ──────────────────────────
+  `(;; ── Copy ELF binary from 0x30000 → 0x300000 ────────────────────────────
     ;; Stage 2 loaded 16 sectors (8192 bytes) at physical 0x30000 (real mode).
     (mov  esi #x30000)
     (mov  edi #x300000)
@@ -85,25 +78,27 @@
     ;; Far jump to 64-bit code segment (selector 0x18 = GDT entry 3)
     (jmp  far #x0018 lm-entry)))
 
-(defparameter *stage2*
+(defun build-stage2 (elf-forms)
+  "Build the Stage 2 form list with ELF-FORMS injected at the end of long mode entry.
+   Called from main.lisp after the kernel and loader modules are loaded."
   `(;; ===== 16-bit real mode =====
     (bits 16)
     (org  #x8000)
     ,@(real-mode-init-forms)
 
-    ;; ── Load ELF binary into 0x30000 (real mode, before PM switch) ───────────
-    ;; Sectors 18-33 (16 sectors = 8KB), ES:BX = 0x3000:0x0000
+    ;; ── Load ELF program into 0x30000 (real mode, before PM switch) ──────────
+    ;; Sectors 10-25 (16 sectors = 8KB), ES:BX = 0x3000:0x0000
     (mov  ax #x3000)
     (mov  es ax)
     (mov  ah #x02)
     (mov  al #x10)       ; 16 sectors = 8KB
     (mov  ch #x00)
-    (mov  cl #x12)       ; sector 18 (1 MBR + 8 Stage2 + 8 kernel = 17, so 18)
+    (mov  cl #x0a)       ; sector 10 (right after Stage 2)
     (mov  dh #x00)
     (mov  dl #x00)
     (mov  bx #x0000)     ; ES:BX = 0x3000:0 = 0x30000
     (int  #x13)
-    ;; ignore carry — if ELF not present, loader will catch bad magic
+    ;; ignore carry — ELF loader verifies magic and halts on mismatch
 
     ;; ── Load GDT ─────────────────────────────────────────────────────────────
     (lgdt (gdt-ptr))
@@ -148,19 +143,26 @@
     (bits 64)
     (label lm-entry)
 
-    ;; Load VGA base into RDI for all 64-bit VGA writes
-    (mov  rdi #xb8000)
-
+    ;; Set up 64-bit data segments
     (mov  ax #x0010)
     (mov  ds ax)
     (mov  es ax)
     (mov  ss ax)
 
+    ;; Load VGA base into RDI for 64-bit status writes
+    (mov  rdi #xb8000)
+
     ;; Row 4: long mode confirmed
     ,@(vga-rdi-status "Entered 64-bit long mode" :row 4)
 
-    ;; Jump to kernel at 0x100000
-    (jmp abs #x100000)))
+    ;; Row 5: loading ELF
+    ,@(vga-rdi-status "Loading ELF kernel..." :row 5)
+
+    ;; ── ELF loader injected here — see (build-stage2 elf-forms) ──────────
+    ,@elf-forms))
+
+;; *stage2* is set in main.lisp after all modules load (needs the ELF loader forms)
+(defvar *stage2* nil)
 
 (defun stage2-size ()
   (length (assemble *stage2*)))

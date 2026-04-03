@@ -54,6 +54,9 @@
 
 (defconstant +elf-magic+ #x464c457f)   ; 0x7F 'E' 'L' 'F'
 
+;;; Stack top for the loaded program — well above the ELF load area at 0x300000
+(defconstant +elf-stack-top+ #x500000)
+
 ;;; ── Generic loader forms ─────────────────────────────────────────────────────
 ;;;
 ;;; These are ISA-specific; each ISA implements load-elf-forms.

@@ -78,7 +78,7 @@ endif
 
 ##@ Development Tasks
 
-$(IMAGE): userland $(SOURCES)
+$(IMAGE): kernel $(SOURCES)
 	echo "[+] Building image..."
 	mkdir -p $$(dirname $(IMAGE))
 	IMAGE="$(IMAGE)" ./$(WRITER)
@@ -104,7 +104,7 @@ build/all:
 	done
 
 .PHONY: clean
-clean: clean/images clean/lisp clean/userland ## Remove build artifacts
+clean: clean/images clean/lisp clean/kernel ## Remove build artifacts
 
 .PHONY: clean/images
 clean/images:
@@ -115,7 +115,7 @@ clean/lisp: ## Force ASDF to recompile all Lisp sources on next build
 	rm -rf ~/.cache/common-lisp
 
 .PHONY: clean/userland
-clean/userland: ## Remove compiled userland binaries
+clean/kernel: ## Remove compiled kernel binaries
 	rm -f build/*.elf
 
 .PHONY: debug
@@ -139,31 +139,31 @@ test: test/unit ## Run tests
 test/unit: ## Run unit tests
 	./scripts/run-tests.lisp
 
-##@ Userland
+##@ Kernel
 
 # Cross-compiler selection per arch (prefer elf toolchains, fall back to linux-gnu)
 CC_x86_64  ?= $(or $(shell command -v x86_64-elf-gcc 2>/dev/null), \
                    $(shell command -v x86_64-linux-gnu-gcc 2>/dev/null), \
                    gcc)
 
-USERLAND_CFLAGS := -ffreestanding -nostdlib -static -O2
+KERNEL_CFLAGS := -ffreestanding -nostdlib -static -O2
 
-.PHONY: userland
-userland: build/hello-$(TARGET_ARCH).elf ## Compile userland for current TARGET_ARCH
+.PHONY: kernel
+kernel: build/kernel-$(TARGET_ARCH).elf ## Compile kernel for current TARGET_ARCH
 
-.PHONY: userland/all
-userland/all: build/hello-x86_64.elf ## Compile userland programs for all architectures
+.PHONY: kernel/all
+kernel/all: build/kernel-x86_64.elf ## Compile kernel for all architectures
 
-build/hello-x86_64.elf: src/userland/hello/hello.c src/userland/hello/hello-x86_64.ld
+build/kernel-x86_64.elf: src/kernel/main.c src/kernel/kernel-x86_64.ld
 	mkdir -p build
 	@if [ -z "$(CC_x86_64)" ] || ! $(CC_x86_64) --target-help 2>&1 | grep -q x86_64 2>/dev/null; then \
-	    if ! $(CC_x86_64) -ffreestanding -nostdlib -static -O2 -T src/userland/hello/hello-x86_64.ld -o $@ $< 2>/dev/null; then \
-	        echo "[ecclesia] Skipping x86_64 userland — no suitable cross-compiler"; \
+	    if ! $(CC_x86_64) -ffreestanding -nostdlib -static -O2 -T src/kernel/kernel-x86_64.ld -o $@ $< 2>/dev/null; then \
+	        echo "[ecclesia] Skipping x86_64 kernel — no suitable cross-compiler"; \
 	        echo "[ecclesia] Run 'make setup/toolchain' to install x86_64-linux-gnu-gcc"; \
 	        exit 0; \
 	    fi; \
 	else \
-	    $(CC_x86_64) $(USERLAND_CFLAGS) -T src/userland/hello/hello-x86_64.ld -o $@ $<; \
+	    $(CC_x86_64) $(KERNEL_CFLAGS) -T src/kernel/kernel-x86_64.ld -o $@ $<; \
 	fi
 	@test -f $@ && echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)" || true
 

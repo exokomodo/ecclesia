@@ -8,7 +8,7 @@
 ;;;;   5. Enable PAE, EFER.LME, paging → far jump to 64-bit
 ;;;;   6. Parse ELF64 header, copy PT_LOAD segments, jump to e_entry
 
-(in-package #:ecclesia.boot)
+(in-package #:ecclesia.bootstrap)
 
 
 

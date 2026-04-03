@@ -11,7 +11,7 @@
 (defconstant +sector+        512)
 (defconstant +stage2-offset+ (* 1 +sector+))   ; byte 512
 (defconstant +elf-offset+    (* 9 +sector+))   ; byte 4608 — sector 10
-(defconstant +elf-magic+     #x7f)             ; first byte of ELF magic
+(defconstant +elf-magic-byte+ #x7f)             ; first byte of ELF magic
 
 (defun floppy-image-path ()
   (let* ((arch (or (sb-ext:posix-getenv "TARGET_ARCH") "x86_64"))
@@ -55,20 +55,20 @@
 
     ;; ── ELF slot ─────────────────────────────────────────────────────────
     (let* ((elf-first  (aref img +elf-offset+))
-           (elf-present (= elf-first +elf-magic+))
+           (elf-present (= elf-first +elf-magic-byte+))
            (arch        (or (sb-ext:posix-getenv "TARGET_ARCH") "x86_64"))
-           (elf-path    (format nil "build/hello-~a.elf" arch))
+           (elf-path    (format nil "build/kernel-~a.elf" arch))
            (elf-built   (probe-file elf-path)))
       (cond
         (elf-present
-         (assert= +elf-magic+ elf-first "ELF slot byte 0 is 0x7F")
+         (assert= +elf-magic-byte+ elf-first "ELF slot byte 0 is 0x7F")
          (assert= (char-code #\E) (aref img (+ +elf-offset+ 1)) "ELF slot byte 1 is 'E'")
          (assert= (char-code #\L) (aref img (+ +elf-offset+ 2)) "ELF slot byte 2 is 'L'")
          (assert= (char-code #\F) (aref img (+ +elf-offset+ 3)) "ELF slot byte 3 is 'F'")
          (format t "  INFO  ELF embedded at sector 10: ~d bytes~%"
                  (count-if #'plusp (subseq img +elf-offset+ (+ +elf-offset+ (* 16 +sector+))))))
         (elf-built
-         (assert= +elf-magic+ elf-first
+         (assert= +elf-magic-byte+ elf-first
                   "ELF slot byte 0 is 0x7F (ELF was built but not embedded — rebuild image)"))
         (t
          (format t "  SKIP  ELF slot empty — no cross-compiler available (run 'make setup/toolchain')~%"))))

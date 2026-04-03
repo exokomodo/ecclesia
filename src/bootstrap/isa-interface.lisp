@@ -11,7 +11,7 @@
 ;;;; No methods are defined here — see kernel/x86_64.lisp for the x86_64
 ;;;; implementations.
 
-(in-package #:ecclesia.kernel)
+(in-package #:ecclesia.bootstrap)
 
 ;;; ── Build-target selection ──────────────────────────────────────────────────
 

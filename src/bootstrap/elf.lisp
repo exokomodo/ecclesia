@@ -33,7 +33,7 @@
 ;;;;
 ;;;; After loading, jumps to e_entry.
 
-(in-package #:ecclesia.loader)
+(in-package #:ecclesia.bootstrap)
 
 ;;; ── ELF64 field offsets ──────────────────────────────────────────────────────
 

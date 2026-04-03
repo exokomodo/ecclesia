@@ -15,7 +15,7 @@
 (require 'asdf)
 (pushnew (truename "./") asdf:*central-registry* :test #'equal)
 (asdf:oos 'asdf:load-op 'ecclesia)
-(in-package #:ecclesia)
+(in-package #:ecclesia.bootstrap)
 
 (defconstant +floppy-total-size+ (* 2880 512))  ; standard 1.44MB
 (defconstant +elf-sector-count+  16)            ; sectors reserved for ELF
@@ -54,7 +54,7 @@
 
       ;; ── Load ELF program if available ────────────────────────────────────
       ;; ELF goes at sector 10 (right after Stage 2)
-      (let* ((elf-path    (format nil "build/hello-~a.elf" target-arch))
+      (let* ((elf-path    (format nil "build/kernel-~a.elf" target-arch))
              (elf-bytes   (when (probe-file elf-path)
                             (with-open-file (f elf-path :element-type '(unsigned-byte 8))
                               (let ((buf (make-array (file-length f)

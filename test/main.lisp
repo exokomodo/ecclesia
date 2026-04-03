@@ -6,9 +6,8 @@
 
 (defpackage #:ecclesia-test-kernel
   (:use #:cl
-        #:ecclesia
         #:ecclesia.assembler
-        #:ecclesia.boot))
+        #:ecclesia.bootstrap))
 (in-package #:ecclesia-test-kernel)
 
 (defun assert= (expected actual description)

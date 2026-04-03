@@ -10,9 +10,9 @@
 ;;;;
 ;;;; Clobbers: RAX, RBX, RCX, RDX, RDI, RSI
 
-(in-package #:ecclesia.loader)
+(in-package #:ecclesia.bootstrap)
 
-(defmethod load-elf-forms ((isa ecclesia.kernel.x86_64:x86_64) elf-load-addr)
+(defmethod load-elf-forms ((isa x86_64) elf-load-addr)
   `(;; ── Load ELF base into RSI ────────────────────────────────────────────
     (mov rsi ,elf-load-addr)
 

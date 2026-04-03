@@ -3,7 +3,7 @@
 ;;;; These functions emit the boot steps that are identical regardless
 ;;;; of whether the final target is 32-bit or 64-bit.
 
-(in-package #:ecclesia.boot)
+(in-package #:ecclesia.bootstrap)
 
 (defun real-mode-init-forms ()
   "16-bit real mode initialisation: disable interrupts, zero segment

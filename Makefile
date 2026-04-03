@@ -135,15 +135,19 @@ build/all:
 	done
 
 .PHONY: clean
-clean: clean/images clean/lisp ## Remove build artifacts
+clean: clean/images clean/lisp clean/userland ## Remove build artifacts
 
 .PHONY: clean/images
 clean/images:
-	rm -f build/*.img build/*.bin build/*.elf *.img *.bin
+	rm -f build/*.img build/*.bin *.img *.bin
 
 .PHONY: clean/lisp
 clean/lisp: ## Force ASDF to recompile all Lisp sources on next build
 	rm -rf ~/.cache/common-lisp
+
+.PHONY: clean/userland
+clean/userland: ## Remove compiled userland binaries
+	rm -f build/*.elf
 
 .PHONY: debug
 debug: build ## Build and boot in QEMU with GDB support

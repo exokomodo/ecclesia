@@ -109,7 +109,7 @@ endif
 
 ##@ Development Tasks
 
-$(IMAGE): $(SOURCES)
+$(IMAGE): userland $(SOURCES)
 	echo "[+] Building image..."
 	mkdir -p $$(dirname $(IMAGE))
 	IMAGE="$(IMAGE)" ./$(WRITER)

@@ -11,7 +11,7 @@
 ;;;;   #x0a  bright green        #x0c  bright red
 ;;;;   #x0e  yellow              #x08  dark grey
 
-(in-package #:ecclesia.utils)
+(in-package #:ecclesia.bootstrap)
 
 (defconstant +vga-base+ #xb8000)
 (defconstant +vga-cols+ 80)

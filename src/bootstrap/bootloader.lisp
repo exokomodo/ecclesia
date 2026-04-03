@@ -7,7 +7,7 @@
 ;;;;   0x7C00  Stage 1 MBR (this file, 512 bytes)
 ;;;;   0x8000  Stage 2 (loaded by Stage 1 from sector 2+)
 
-(in-package #:ecclesia.boot)
+(in-package #:ecclesia.bootstrap)
 
 (defparameter *boot-message*
   (concatenate 'string

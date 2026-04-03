@@ -1,29 +1,12 @@
 ;;;; package.lisp — Ecclesia package definitions
 ;;;;
-;;;; ecclesia.utils         — VGA helpers, common utilities
-;;;; ecclesia.assembler     — Generic assembler
-;;;; ecclesia.boot          — boot code
-;;;; ecclesia.kernel        — ISA-agnostic kernel generics
-;;;; ecclesia.kernel.x86_64 — x86_64 implementations of the kernel generics
-;;;; ecclesia               — kernel image definitions (*kernel-main*, etc.)
-
-(defpackage #:ecclesia.utils
-  (:use #:cl)
-  (:export
-   #:+vga-base+
-   #:+vga-cols+
-   #:vga-addr
-   #:vga-offset
-   #:vga-cell
-   #:vga-clear-forms
-   #:vga-write
-   #:vga-status
-   #:vga-rdi-write
-   #:vga-rdi-status))
+;;;; ecclesia.assembler  — generic x86_64 assembler (src/assembler/)
+;;;; ecclesia.bootstrap  — image build: MBR, Stage 2, ISA, ELF loader (src/bootstrap/)
+;;;;
+;;;; src/kernel/  — kernel entry point (C for now); no Lisp package needed yet.
 
 (defpackage #:ecclesia.assembler
-  (:use #:cl
-        #:ecclesia.utils)
+  (:use #:cl)
   (:export
    #:assemble
    #:collect-labels
@@ -33,32 +16,35 @@
    #:*asm-bits*
    #:*instruction-table*))
 
-(defpackage #:ecclesia.boot
-  (:use #:cl
-        #:ecclesia.assembler
-        #:ecclesia.utils)
+(defpackage #:ecclesia.bootstrap
+  (:use #:cl #:ecclesia.assembler)
   (:export
-   #:r8-p
-   #:r16-p
-   #:r32-p
-   #:r64-p
-   #:sreg-p
-   #:creg-p
-   #:push-byte
-   #:push-u16
-   #:push-u32
-   #:push-u64
-   #:cur-addr
-   #:resolve
-   #:maybe-66
+   ;; VGA helpers
+   #:+vga-base+
+   #:+vga-cols+
+   #:vga-addr
+   #:vga-offset
+   #:vga-cell
+   #:vga-clear-forms
+   #:vga-write
+   #:vga-status
+   #:vga-rdi-write
+   #:vga-rdi-status
+   ;; Register predicates and encoding helpers
+   #:r8-p #:r16-p #:r32-p #:r64-p #:sreg-p #:creg-p
+   #:push-byte #:push-u16 #:push-u32 #:push-u64
+   #:cur-addr #:resolve #:maybe-66
+   ;; Boot constants
    #:+floppy-sector-size+
    #:+stage2-sectors+
    #:+stage2-size+
    #:+code-size+
+   ;; Stage 2 helpers
    #:real-mode-init-forms
    #:a20-enable-forms
    #:enter-protected-mode-forms
    #:setup-pm-segments-forms
+   ;; Boot images
    #:*bootloader*
    #:boot-message-db-forms
    #:*boot-message*
@@ -66,12 +52,8 @@
    #:build-stage2
    #:stage2-size
    #:page-table-forms
-   #:long-mode-entry-forms))
-
-(defpackage #:ecclesia.kernel
-  (:use #:cl
-        #:ecclesia.utils)
-  (:export
+   #:long-mode-entry-forms
+   ;; ISA protocol
    #:*prompt-str*
    #:*prompt-row*
    #:*vga-screen-rows*
@@ -100,40 +82,20 @@
    #:asm-prelude-forms
    #:unconditional-jump-forms
    #:print-prompt-forms
-   #:isa-supports-elf-loader-p))
-
-(defpackage #:ecclesia.kernel.x86_64
-  (:use #:cl
-        #:ecclesia.kernel
-        #:ecclesia.utils)
-  (:export #:x86_64))
-
-(defpackage #:ecclesia.loader
-  (:use #:cl
-        #:ecclesia.assembler
-        #:ecclesia.kernel
-        #:ecclesia.kernel.x86_64)
-  (:export #:load-elf-forms
-           #:+elf-magic+
-           #:+elf64-e-entry+
-           #:+elf64-e-phoff+
-           #:+elf64-e-phentsize+
-           #:+elf64-e-phnum+
-           #:+ph64-p-type+
-           #:+ph64-p-offset+
-           #:+ph64-p-vaddr+
-           #:+ph64-p-filesz+
-           #:+ph64-p-memsz+
-           #:+pt-load+))
-
-(defpackage #:ecclesia
-  (:use #:cl
-        #:ecclesia.assembler
-        #:ecclesia.boot
-        #:ecclesia.kernel
-        #:ecclesia.kernel.x86_64
-        #:ecclesia.loader
-        #:ecclesia.utils)
-  (:export
-   #:make-kernel-main
-   #:*kernel-main*))
+   #:isa-supports-elf-loader-p
+   ;; ISA classes
+   #:x86_64
+   ;; ELF loader
+   #:load-elf-forms
+   #:+elf-magic+
+   #:+elf64-e-entry+
+   #:+elf64-e-phoff+
+   #:+elf64-e-phentsize+
+   #:+elf64-e-phnum+
+   #:+ph64-p-type+
+   #:+ph64-p-offset+
+   #:+ph64-p-vaddr+
+   #:+ph64-p-filesz+
+   #:+ph64-p-memsz+
+   #:+pt-load+
+   #:+elf-stack-top+))

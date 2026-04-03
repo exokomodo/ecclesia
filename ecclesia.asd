@@ -7,22 +7,20 @@
   ((:module "src"
     :components
     ((:file "package")
-     (:module "utils"
-      :components ((:file "vga")))
      (:module "assembler"
       :components ((:file "assembler")
                    (:file "x86_64")))
-     (:module "boot"
-      :components ((:file "bootloader-x86_64")
-                   (:file "stage2-x86_base")
-                   (:file "stage2-x86_64")))
-     (:module "kernel"
-      :components ((:file "interface")
-                   (:file "x86_64")))
-     (:module "loader"
-      :components ((:file "elf")
-                   (:file "elf-x86_64")))
-     (:file "main")))))
+     (:module "bootstrap"
+      :serial t
+      :components ((:file "vga")
+                   (:file "isa-interface")
+                   (:file "isa-x86_64")
+                   (:file "stage2-base")
+                   (:file "bootloader")
+                   (:file "elf")
+                   (:file "elf-x86_64")
+                   (:file "stage2")
+                   (:file "image")))))))
 
 (defsystem ecclesia/test
   :description "Ecclesia unit tests."

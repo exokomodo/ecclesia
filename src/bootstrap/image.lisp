@@ -4,7 +4,7 @@
 ;;;;   1. Builds *stage2* by injecting the ELF loader forms into the Stage 2 template
 ;;;;   2. Exports *kernel-main* as nil (no separate kernel binary — Stage 2 is it)
 
-(in-package #:ecclesia)
+(in-package #:ecclesia.bootstrap)
 
 ;;; ── Wire up Stage 2 with the ELF loader ─────────────────────────────────────
 ;;;
@@ -12,10 +12,10 @@
 ;;; to inline at the long-mode entry point. We supply the ELF loader forms here
 ;;; now that both the kernel ISA class and the loader are fully defined.
 
-(setf ecclesia.boot:*stage2*
-      (ecclesia.boot:build-stage2
-       (ecclesia.loader:load-elf-forms
-        (make-instance 'ecclesia.kernel.x86_64:x86_64)
+(setf *stage2*
+      (build-stage2
+       (load-elf-forms
+        (make-instance 'x86_64)
         #x300000)))
 
 ;;; ── *kernel-main* — no longer used ──────────────────────────────────────────

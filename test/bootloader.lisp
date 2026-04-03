@@ -3,7 +3,7 @@
 (defpackage #:ecclesia-test
   (:use #:cl
         #:ecclesia.assembler
-        #:ecclesia.boot))
+        #:ecclesia.bootstrap))
 (in-package #:ecclesia-test)
 
 (defun assert= (expected actual description)

@@ -32,9 +32,9 @@ jobs:
         run: |
           make setup/toolchain
 
-      - name: Build userland [${{ matrix.target-arch }}]
+      - name: Build kernel [${{ matrix.target-arch }}]
         run: |
-          make userland
+          make kernel
 
       - name: Build [${{ matrix.target-arch }}]
         run: |

@@ -40,36 +40,42 @@
     (jnz elf-ph-next)
 
     ;; ── Copy PT_LOAD segment ──────────────────────────────────────────────
-    ;; RDI = p_vaddr
+    ;; Save loop counter (ECX = phnum remaining) and PH pointer (RBX)
+    (push-reg rcx)                ; save loop counter
+    (push-reg rbx)                ; save PH pointer
+
+    ;; RDI = p_vaddr (destination)
     (mem-load64 rdi rbx ,+ph64-p-vaddr+)
-    ;; RDX = p_offset; source = RSI + p_offset
-    (mem-load64 rdx rbx ,+ph64-p-offset+)
-    ;; Save RBX and filesz before REP MOVSB clobbers RCX
-    (push-reg rbx)
+    ;; RCX = p_filesz (byte count for copy)
     (mem-load64 rcx rbx ,+ph64-p-filesz+)
-    (push-reg rcx)                ; save filesz
-    ;; RSI = ELF base + p_offset  (rdx already = p_offset; add base)
+    ;; RSI = ELF base + p_offset (source)
+    (mem-load64 rdx rbx ,+ph64-p-offset+)
     (mov-r64 rsi rdx)
-    (add-imm64 rsi ,elf-load-addr) ; rsi = p_offset + elf_base
-    ;; REP MOVSB — copy filesz bytes
+    (add-imm64 rsi ,elf-load-addr)
+    ;; Save filesz for BSS calculation
+    (push-reg rcx)
+    ;; REP MOVSB — copy filesz bytes from [RSI] to [RDI]
     (rep movsb)
 
     ;; ── Zero BSS (memsz - filesz bytes after segment) ────────────────────
     (pop-reg rcx)                 ; rcx = filesz
     (pop-reg rbx)                 ; restore PH pointer
     (mem-load64 rdx rbx ,+ph64-p-memsz+)
-    (sub rdx rcx)                 ; rdx = memsz - filesz
+    (sub rdx rcx)                 ; rdx = memsz - filesz = BSS size
     (cmp rdx 0)
-    (jz elf-ph-next)              ; no BSS to zero
-    (mem-load64 rdi rbx ,+ph64-p-vaddr+)
-    (add rdi rcx)                 ; rdi = p_vaddr + filesz (BSS start)
+    (jz elf-bss-done)             ; no BSS to zero
+    ;; RDI already points past the copied data (REP MOVSB advanced it)
     (mov-r64 rcx rdx)
     (xor eax eax)
     (rep stosb)
+    (label elf-bss-done)
+
+    ;; Restore loop counter
+    (pop-reg rcx)                 ; rcx = phnum remaining
 
     ;; ── Advance to next PH entry (size = 56 bytes for ELF64) ─────────────
     (label elf-ph-next)
-    (mov rsi ,elf-load-addr)      ; restore RSI (clobbered by rep)
+    (mov rsi ,elf-load-addr)      ; restore RSI (clobbered by rep movsb)
     (add-imm64 rbx 56)
     (dec ecx)
     (jmp abs elf-ph-loop)

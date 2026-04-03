@@ -77,8 +77,11 @@
     ;; ── Call entry point (CALL so _start can RET back here) ──────────────
     (label elf-jump-entry)
     (mem-load64 rax rsi ,+elf64-e-entry+)
+    ;; Give userland its own stack at 0x500000 (well above kernel at 0x200000)
+    (mov rsp #x500000)
     (call-reg rax)
-    ;; _start returned — resume keyboard loop
+    ;; _start returned — restore kernel stack and resume keyboard loop
+    (mov rsp #x200000)
     (jmp abs kbd-main-loop)
 
     ;; ── Bad magic: write "ELF?" in red on VGA row 7 then resume keyboard ──

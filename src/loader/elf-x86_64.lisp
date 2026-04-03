@@ -83,24 +83,20 @@
     (dec ecx)
     (jmp abs elf-ph-loop)
 
-    ;; ── Call entry point (CALL so _start can RET back here) ──────────────
+    ;; ── Jump to entry point ───────────────────────────────────────────────
     (label elf-jump-entry)
     (mem-load64 rax rsi ,+elf64-e-entry+)
-    ;; Give userland its own stack at 0x500000 (well above kernel at 0x200000)
-    (mov rsp #x500000)
-    (call-reg rax)
-    ;; _start returned — restore kernel stack and resume keyboard loop
-    (mov rsp #x200000)
-    (jmp abs kbd-main-loop)
+    ;; Set up a clean stack for the loaded program
+    (mov rsp ,+elf-stack-top+)
+    (jmp-reg rax)
+    ;; (never returns)
 
-    ;; ── Bad magic: write "ELF?" in red on VGA row 7 then resume keyboard ──
-    ;; Must use register-indirect: in 64-bit mode, MOV [imm32],imm is RIP-relative.
+    ;; ── Bad magic: print "ELF?" in red on VGA row 7 and halt ─────────────
     ;; Row 7 col 0 = 0xB8000 + 7*80*2 = 0xB8460
     (label elf-bad-magic)
-    (mov rdi #xb8460)             ; absolute VGA address in register
-    (mov-rdi-word 0 #x0c45)      ; 'E' red  (byte offset 0)
-    (mov-rdi-word 2 #x0c4c)      ; 'L' red  (byte offset 2)
-    (mov-rdi-word 4 #x0c46)      ; 'F' red  (byte offset 4)
-    (mov-rdi-word 6 #x0c3f)      ; '?' red  (byte offset 6)
-    ;; Return to keyboard loop — don't hlt, keep the OS alive
-    (jmp abs kbd-main-loop)))
+    (mov rdi #xb8460)
+    (mov-rdi-word 0 #x0c45)      ; 'E' red
+    (mov-rdi-word 2 #x0c4c)      ; 'L' red
+    (mov-rdi-word 4 #x0c46)      ; 'F' red
+    (mov-rdi-word 6 #x0c3f)      ; '?' red
+    (hlt)))

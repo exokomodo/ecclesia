@@ -55,7 +55,7 @@
 ;;; Let's use a near JMP to absolute 0x8000 from known position.
 ;;; Total code before msg = let's compute
 
-(defconstant +code-size+ 82)
+(defconstant +code-size+ 58)
 
 (defun make-bootloader ()
   (let* ((msg-forms  (boot-message-db-forms))
@@ -101,26 +101,8 @@
       (int  #x13)
       (jc-short disk-error)
 
-      ;; Load kernel (sectors 6-13, 8 sectors = 4KB) into 0x1000:0x0000 = 0x10000
-      ;; We can't load to 0x100000 from real mode without A20+unreal mode tricks.
-      ;; Use segment trick: ES=0x1000, BX=0x0000 → physical 0x10000
-      ;; Then Stage 2 copies from 0x10000 to 0x100000 in PM.
-      ;; Actually, simpler: use unreal mode to access >1MB, OR just load at
-      ;; a low address and copy. For now load at 0x20000 (ES=0x2000, BX=0).
-      (mov  ax #x2000)
-      (mov  es ax)
-      (mov  ah #x02)
-      (mov  al #x08)       ; 8 sectors = 4KB kernel
-      (mov  ch #x00)
-      (mov  cl #x0a)       ; sector 10 (after 8 sectors of Stage 2)
-      (mov  dh #x00)
-      (mov  dl #x00)
-      (mov  bx #x0000)     ; ES:BX = 0x2000:0x0000 = physical 0x20000
-      (int  #x13)
-      (jc-short disk-error)    ; carry set = read failed
-
       ;; Jump to Stage 2 at 0x8000
-      ;; (ELF binary is loaded by Stage 2 before entering protected mode)
+      ;; (Stage 2 loads the ELF binary before entering protected mode)
       (jmp  abs #x8000)
 
       ;; Disk error: print 'E' and halt

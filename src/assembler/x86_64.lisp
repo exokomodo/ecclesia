@@ -687,3 +687,10 @@
     (push-byte buf #x0f) (push-byte buf #xb7)
     (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) (enc *r64* base)))
     (push-u32 buf off)))
+
+;;; HLT — halt the CPU
+(register-instruction 'hlt
+  (lambda (args mode) (declare (ignore args mode)) 1)
+  (lambda (args labels origin buf mode)
+    (declare (ignore args labels origin mode))
+    (push-byte buf #xf4)))

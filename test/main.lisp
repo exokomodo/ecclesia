@@ -1,4 +1,8 @@
-;;;; test/main.lisp — kernel unit tests
+;;;; test/main.lisp — Stage 2 ELF loader integration tests
+;;;;
+;;;; Now that Stage 2 *is* the kernel (no separate kernel binary),
+;;;; we verify that the assembled Stage 2 image contains the expected
+;;;; ELF loader machinery.
 
 (defpackage #:ecclesia-test-kernel
   (:use #:cl
@@ -19,32 +23,32 @@
 (defun run-tests ()
   (format t "~%Running kernel unit tests...~%~%")
 
-  (let ((img (assemble *kernel-main*)))
+  ;; Stage 2 contains the ELF loader — verify it assembles and is bounded
+  (let ((img (assemble *stage2*)))
 
     (assert= t (> (length img) 0)
-             "Kernel assembles to a non-empty image")
+             "Stage 2 + ELF loader assembles to a non-empty image")
 
     (assert= t (<= (length img) (* 8 +floppy-sector-size+))
-             "Kernel fits within 8 sectors (4096 bytes)")
+             "Stage 2 + ELF loader fits within 8 sectors (4096 bytes)")
 
-    ;; REX.W prefix (0x48) should appear (MOV RSP, imm64)
-    (assert= #x48 (aref img 0)
-             "Kernel first byte is REX.W prefix (MOV RSP)")
+    ;; CLI (0xFA) — Stage 2 starts with interrupt disable
+    (assert= #xfa (aref img 0)
+             "Stage 2 first byte is CLI (0xFA)")
 
-    ;; IN AL opcode (0xE4) should appear (PS/2 keyboard polling)
-    (let ((in-pos (loop for i from 0 below (length img)
-                        when (= (aref img i) #xe4) return i)))
-      (assert= t (not (null in-pos))
-               "Kernel contains IN AL (0xE4) for keyboard polling"))
+    ;; REP MOVSD (0xF3 0xA5) — segment copy for ELF loading
+    (let ((rep-pos (loop for i from 0 below (- (length img) 1)
+                         when (and (= (aref img i) #xf3)
+                                   (= (aref img (1+ i)) #xa5))
+                         return i)))
+      (assert= t (not (null rep-pos))
+               "Stage 2 contains REP MOVSD (0xF3 0xA5) for ELF segment copy"))
 
-    ;; Scancode table should be present (contains ASCII 113='q' at index 0x10)
-    ;; 113 = 0x71
-    (let ((q-pos (loop for i from 0 below (- (length img) 1)
-                       when (and (= (aref img i) 113)     ; 'q'
-                                 (= (aref img (1+ i)) 119)) ; 'w' follows
-                       return i)))
-      (assert= t (not (null q-pos))
-               "Kernel contains scancode→ASCII table (q/w at consecutive offsets)")))
+    ;; HLT (0xF4) — ELF bad-magic path halts
+    (let ((hlt-pos (loop for i from 0 below (length img)
+                         when (= (aref img i) #xf4) return i)))
+      (assert= t (not (null hlt-pos))
+               "Stage 2 contains HLT (0xF4) for bad-ELF halt")))
 
   (format t "~%All kernel tests passed.~%"))
 

@@ -16,11 +16,18 @@
   `(;; ── Load ELF base into RSI ────────────────────────────────────────────
     (mov rsi ,elf-load-addr)
 
+    ;; ── Debug: 'L' in cyan on row 8 col 0 = entered loader ──────────────
+    (mov rdi #xb8000)
+    (mov-rdi-word ,(* 8 80 2) #x0b4c)   ; col 0: 'L'
+
     ;; ── Verify ELF magic ─────────────────────────────────────────────────
-    ;; First 4 bytes must be 0x7F 'E' 'L' 'F'
     (mem-load32 eax rsi 0)
     (cmp eax ,+elf-magic+)
     (jnz elf-bad-magic)
+
+    ;; ── Debug: 'O' in cyan col 1 = magic ok ─────────────────────────────
+    (mov rdi #xb8000)
+    (mov-rdi-word ,(+ (* 8 80 2) 2) #x0b4f)   ; col 1: 'O'
 
     ;; ── Read e_phnum → ECX ───────────────────────────────────────────────
     (mem-load16-zx ecx rsi ,+elf64-e-phnum+)
@@ -82,10 +89,19 @@
 
     ;; ── Call entry point (CALL so _start can RET back here) ──────────────
     (label elf-jump-entry)
+    ;; Debug: 'J' in cyan col 2 = reached jump-entry
+    (mov rdi #xb8000)
+    (mov-rdi-word ,(+ (* 8 80 2) 4) #x0b4a)
     (mem-load64 rax rsi ,+elf64-e-entry+)
+    ;; Debug: 'C' in cyan col 3 = about to call
+    (mov rdi #xb8000)
+    (mov-rdi-word ,(+ (* 8 80 2) 6) #x0b43)
     ;; Give userland its own stack at 0x500000 (well above kernel at 0x200000)
     (mov rsp #x500000)
     (call-reg rax)
+    ;; Debug: 'R' in cyan col 4 = _start returned
+    (mov rdi #xb8000)
+    (mov-rdi-word ,(+ (* 8 80 2) 8) #x0b52)
     ;; _start returned — restore kernel stack and resume keyboard loop
     (mov rsp #x200000)
     (jmp abs kbd-main-loop)

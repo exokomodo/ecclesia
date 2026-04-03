@@ -368,8 +368,10 @@
 ;;; ── ADD ──────────────────────────────────────────────────────────────────────
 
 (definsn add (args mode)
-         (cond ((and (r32-p (first args)) (r32-p (second args))) 2)
-               ((and (r64-p (first args)) (r64-p (second args))) 3)  ; REX.W + 0x01
+         (cond ((and (r32-p (first args)) (r32-p (second args)))    2)
+               ((and (r64-p (first args)) (r64-p (second args)))    3)
+               ((and (r32-p (first args)) (numberp (second args)))  6)  ; ADD r32, imm32
+               ((and (r64-p (first args)) (r64-p  (second args)))   3)
                (t (error "Unknown ADD form: ~a ~a" (first args) (second args))))
          (args labels origin buf mode)
   (let ((dst (first args)) (src (second args)))
@@ -378,6 +380,10 @@
        (push-byte buf #x48)   ; REX.W
        (push-byte buf #x01)
        (push-byte buf (logior #xc0 (ash (enc *r64* src) 3) (enc *r64* dst))))
+      ((and (r32-p dst) (numberp src))
+       (push-byte buf #x81)
+       (push-byte buf (logior #xc0 (enc *r32* dst)))
+       (push-u32 buf src))
       (t
        (push-byte buf #x01)
        (push-byte buf (logior #xc0 (ash (enc *r32* src) 3) (enc *r32* dst)))))))
@@ -514,3 +520,170 @@
          (error "Short jump out of range to ~a (rel=~d)" (second args) rel))
        (push-byte buf #xeb)
        (push-byte buf (logand rel #xff))))))
+
+;;; ── ELF loader extensions ────────────────────────────────────────────────────
+
+;;; CMP r32, imm32  →  0x81 /7 id
+;;; CMP r64, imm32  →  REX.W 0x81 /7 id
+(definsn cmp (args mode)
+         (cond ((and (r32-p (first args)) (numberp (second args))) 6)
+               ((and (r64-p (first args)) (numberp (second args))) 7)
+               ((and (r32-p (first args)) (r32-p (second args)))  2)
+               ((and (r64-p (first args)) (r64-p (second args)))  3)
+               (t (error "Unknown CMP form: ~a ~a" (first args) (second args))))
+         (args labels origin buf mode)
+  (let ((dst (first args)) (src (second args)))
+    (cond
+      ((and (r32-p dst) (numberp src))
+       (push-byte buf #x81)
+       (push-byte buf (logior #xf8 (enc *r32* dst)))
+       (push-u32 buf src))
+      ((and (r64-p dst) (numberp src))
+       (push-byte buf #x48) (push-byte buf #x81)
+       (push-byte buf (logior #xf8 (enc *r64* dst)))
+       (push-u32 buf src))
+      ((and (r32-p dst) (r32-p src))
+       (push-byte buf #x39)
+       (push-byte buf (logior #xc0 (ash (enc *r32* src) 3) (enc *r32* dst))))
+      ((and (r64-p dst) (r64-p src))
+       (push-byte buf #x48) (push-byte buf #x39)
+       (push-byte buf (logior #xc0 (ash (enc *r64* src) 3) (enc *r64* dst)))))))
+
+;;; DEC r32  →  0xFF /1 (or 0x48+r in 32-bit mode, but 0xFF /1 is universal)
+(definsn dec (args mode)
+         (cond ((r32-p (first args)) 2)
+               ((r64-p (first args)) 3)
+               (t (error "Unknown DEC form")))
+         (args labels origin buf mode)
+  (let ((r (first args)))
+    (cond
+      ((r32-p r)
+       (push-byte buf #xff)
+       (push-byte buf (logior #xc8 (enc *r32* r))))
+      ((r64-p r)
+       (push-byte buf #x48) (push-byte buf #xff)
+       (push-byte buf (logior #xc8 (enc *r64* r)))))))
+
+;;; JMP-REG r64  →  REX.W? 0xFF /4  (near indirect)
+;;; Actually for 64-bit mode 0xFF /4 without REX is fine (default 64-bit).
+(definsn jmp-reg (args mode)
+         2
+         (args labels origin buf mode)
+  (let ((r (first args)))
+    (if (r64-p r)
+        (progn (push-byte buf #xff)
+               (push-byte buf (logior #xe0 (enc *r64* r))))
+        (error "JMP-REG requires r64, got ~a" r))))
+
+;;; CALL r64 — indirect call via register (FF /2)
+(definsn call-reg (args mode)
+         2
+         (args labels origin buf mode)
+  (let ((r (first args)))
+    (if (r64-p r)
+        (progn (push-byte buf #xff)
+               (push-byte buf (logior #xd0 (enc *r64* r))))
+        (error "CALL-REG requires r64, got ~a" r))))
+
+;;; MOV r64, r64  — already handled by mov, but ADD r64, r64 is missing:
+;;; ADD r64, r64  →  REX.W 0x01 /r  (already in add definsn)
+;;; SUB r64, r64  →  REX.W 0x29 /r
+(definsn sub (args mode)
+         (cond ((and (r64-p (first args)) (r64-p (second args))) 3)
+               ((and (r32-p (first args)) (r32-p (second args))) 2)
+               ((and (r64-p (first args)) (numberp (second args))) 7)
+               (t (error "Unknown SUB form: ~a ~a" (first args) (second args))))
+         (args labels origin buf mode)
+  (let ((dst (first args)) (src (second args)))
+    (cond
+      ((and (r64-p dst) (r64-p src))
+       (push-byte buf #x48) (push-byte buf #x29)
+       (push-byte buf (logior #xc0 (ash (enc *r64* src) 3) (enc *r64* dst))))
+      ((and (r32-p dst) (r32-p src))
+       (push-byte buf #x29)
+       (push-byte buf (logior #xc0 (ash (enc *r32* src) 3) (enc *r32* dst))))
+      ((and (r64-p dst) (numberp src))
+       (push-byte buf #x48) (push-byte buf #x81)
+       (push-byte buf (logior #xe8 (enc *r64* dst)))
+       (push-u32 buf src)))))
+
+;;; MOV r64, r64 — second form (currently handled by existing mov for r64+number)
+;;; The existing mov only handles r64←imm and r64←r64 is missing from emit!
+;;; (add r64 r64) handles ADD but MOV r64,r64 needs a fix.
+;;; Patch the emit section of mov to handle r64←r64:
+;;; → Actually the definsn handles r64←r64 already via the generic mov emit.
+;;;   Let us verify by searching for it:
+;;; The existing add r64,r64 emits REX.W 0x01 with ModRM. That's ADD not MOV.
+;;; MOV r64,r64 → REX.W 0x89 /r.
+;;; We need to add this to the existing mov definsn. Instead, add as mov-r64:
+
+(definsn mov-r64 (args mode)
+         3
+         (args labels origin buf mode)
+  (let ((dst (first args)) (src (second args)))
+    (push-byte buf #x48) (push-byte buf #x89)
+    (push-byte buf (logior #xc0 (ash (enc *r64* src) 3) (enc *r64* dst)))))
+
+;;; ADD r64, r64 — already in definsn add. Also need ADD r64, imm32:
+(definsn add-imm64 (args mode)
+         7
+         (args labels origin buf mode)
+  (let ((dst (first args)) (imm (second args)))
+    (push-byte buf #x48) (push-byte buf #x81)
+    (push-byte buf (logior #xc0 (enc *r64* dst)))
+    (push-u32 buf imm)))
+
+;;; MOVSB (byte move: DS:[RSI] → ES:[RDI], inc RSI+RDI)
+(definsn movsb (args mode) 1
+         (args labels origin buf mode)
+  (push-byte buf #xa4))
+
+;;; STOSB (byte store: AL → ES:[RDI], inc RDI)
+(definsn stosb (args mode) 1
+         (args labels origin buf mode)
+  (push-byte buf #xaa))
+
+;;; Memory read helpers for ELF parsing:
+;;; (mem32 reg)        → [reg] 32-bit load
+;;; (mem-rsi-u16 off)  → MOVZX ECX, WORD PTR [RSI+off]
+;;; (mem-rsi-u64 off)  → MOV Rn, QWORD PTR [RSI+off]
+;;; (mem-rbx-u64 off)  → MOV Rn, QWORD PTR [RBX+off]
+;;;
+;;; These are handled inline in the loader forms via existing mov + mem32.
+;;; We'll add MOV r64, [reg+disp32] as mem-load64:
+
+(definsn mem-load32 (args mode)
+  ;; (mem-load32 dst reg off) → MOV dst, [reg+disp32] = 6 bytes
+  6
+  (args labels origin buf mode)
+  (let ((dst  (first args))
+        (base (second args))
+        (off  (third args)))
+    (cond
+      ((and (r32-p dst) (r64-p base))
+       (push-byte buf #x8b)
+       (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) (enc *r64* base)))
+       (push-u32 buf off))
+      (t (error "Unknown MEM-LOAD32 form: ~a ~a" dst base)))))
+
+(definsn mem-load64 (args mode)
+  ;; (mem-load64 dst reg off) → REX.W MOV dst, QWORD PTR [reg+disp32] = 7 bytes
+  7
+  (args labels origin buf mode)
+  (let ((dst (first args))
+        (base (second args))
+        (off  (third args)))
+    (push-byte buf #x48) (push-byte buf #x8b)
+    (push-byte buf (logior #x80 (ash (enc *r64* dst) 3) (enc *r64* base)))
+    (push-u32 buf off)))
+
+(definsn mem-load16-zx (args mode)
+  ;; (mem-load16-zx dst reg off) → 0F B7 ModRM disp32 = 7 bytes
+  7
+  (args labels origin buf mode)
+  (let ((dst (first args))
+        (base (second args))
+        (off  (third args)))
+    (push-byte buf #x0f) (push-byte buf #xb7)
+    (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) (enc *r64* base)))
+    (push-u32 buf off)))

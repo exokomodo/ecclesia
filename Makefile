@@ -60,7 +60,7 @@ SOURCES   := ecclesia.asd $(wildcard src/*.lisp src/*.asm) $(WRITER)
 ##@ Environment Setup
 
 .PHONY: setup
-setup: setup/hooks setup/sbcl setup/qemu ## Install all development dependencies
+setup: setup/hooks setup/sbcl setup/qemu setup/toolchain ## Install all development dependencies
 
 .PHONY: setup/hooks
 setup/hooks: ## Install git hooks
@@ -80,16 +80,34 @@ endif
 .PHONY: setup/qemu
 setup/qemu: ## Install QEMU
 ifeq ($(UNAME_S),Linux)
-	sudo apt update && sudo apt install -y qemu-system-x86
+	sudo apt update && sudo apt install -y qemu-system-x86 qemu-system-arm
 else ifeq ($(UNAME_S),Darwin)
 	brew install qemu
 else
 	$(error "Unsupported OS: $(UNAME_S). Please install QEMU manually.")
 endif
 
+.PHONY: setup/toolchain
+setup/toolchain: ## Install cross-compilers for all supported architectures
+ifeq ($(UNAME_S),Linux)
+	sudo apt update && sudo apt install -y \
+	    gcc \
+	    gcc-x86-64-linux-gnu \
+	    gcc-aarch64-linux-gnu \
+	    binutils-x86-64-linux-gnu \
+	    binutils-aarch64-linux-gnu
+	@echo "✅ Cross-compilers installed"
+else ifeq ($(UNAME_S),Darwin)
+	brew install x86_64-elf-gcc aarch64-elf-gcc 2>/dev/null || \
+	brew install x86_64-elf-binutils aarch64-elf-binutils
+	@echo "✅ Cross-compilers installed (via Homebrew)"
+else
+	$(error "Unsupported OS: $(UNAME_S). Please install cross-compilers manually.")
+endif
+
 ##@ Development Tasks
 
-$(IMAGE): $(SOURCES)
+$(IMAGE): userland $(SOURCES)
 	echo "[+] Building image..."
 	mkdir -p $$(dirname $(IMAGE))
 	IMAGE="$(IMAGE)" ./$(WRITER)
@@ -115,7 +133,7 @@ build/all:
 	done
 
 .PHONY: clean
-clean: clean/images clean/lisp ## Remove build artifacts
+clean: clean/images clean/lisp clean/userland ## Remove build artifacts
 
 .PHONY: clean/images
 clean/images:
@@ -124,6 +142,10 @@ clean/images:
 .PHONY: clean/lisp
 clean/lisp: ## Force ASDF to recompile all Lisp sources on next build
 	rm -rf ~/.cache/common-lisp
+
+.PHONY: clean/userland
+clean/userland: ## Remove compiled userland binaries
+	rm -f build/*.elf
 
 .PHONY: debug
 debug: build ## Build and boot in QEMU with GDB support
@@ -145,6 +167,51 @@ test: test/unit ## Run tests
 .PHONY: test/unit
 test/unit: ## Run unit tests
 	./scripts/run-tests.lisp
+
+##@ Userland
+
+# Cross-compiler selection per arch (prefer elf toolchains, fall back to linux-gnu)
+CC_x86_64  ?= $(or $(shell command -v x86_64-elf-gcc 2>/dev/null), \
+                   $(shell command -v x86_64-linux-gnu-gcc 2>/dev/null), \
+                   gcc)
+CC_aarch64 ?= $(or $(shell command -v aarch64-elf-gcc 2>/dev/null), \
+                   $(shell command -v aarch64-linux-gnu-gcc 2>/dev/null))
+
+USERLAND_CFLAGS := -ffreestanding -nostdlib -static -O2
+
+.PHONY: userland
+userland: build/hello-$(TARGET_ARCH).elf ## Compile userland for current TARGET_ARCH
+
+.PHONY: userland/all
+userland/all: build/hello-x86_64.elf build/hello-aarch64.elf ## Compile userland programs for all architectures
+
+build/hello-x86_64.elf: src/userland/hello/hello.c src/userland/hello/hello-x86_64.ld
+	mkdir -p build
+	@if [ -z "$(CC_x86_64)" ] || ! $(CC_x86_64) --target-help 2>&1 | grep -q x86_64 2>/dev/null; then \
+	    if ! $(CC_x86_64) -ffreestanding -nostdlib -static -O2 -T src/userland/hello/hello-x86_64.ld -o $@ $< 2>/dev/null; then \
+	        echo "[ecclesia] Skipping x86_64 userland — no suitable cross-compiler"; \
+	        echo "[ecclesia] Run 'make setup/toolchain' to install x86_64-linux-gnu-gcc"; \
+	        exit 0; \
+	    fi; \
+	else \
+	    $(CC_x86_64) $(USERLAND_CFLAGS) -T src/userland/hello/hello-x86_64.ld -o $@ $<; \
+	fi
+	@test -f $@ && echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)" || true
+
+
+build/hello-i386.elf:
+	@echo "[ecclesia] Skipping i386 userland — no ELF loader for i386 in this branch"
+	@echo "[ecclesia] Run 'make setup/toolchain' to install i686-linux-gnu-gcc"
+
+build/hello-aarch64.elf: src/userland/hello/hello.c src/userland/hello/hello-aarch64.ld
+	mkdir -p build
+	@if [ -z "$(CC_aarch64)" ]; then \
+	    echo "[ecclesia] Skipping aarch64 userland — no cross-compiler found"; \
+	    echo "[ecclesia] Run 'make setup/toolchain' to install gcc-aarch64-linux-gnu"; \
+	elif ! $(CC_aarch64) $(USERLAND_CFLAGS) -T src/userland/hello/hello-aarch64.ld -o $@ $< 2>/dev/null; then \
+	    echo "[ecclesia] Skipping aarch64 userland — compilation failed"; \
+	fi
+	@test -f $@ && echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)" || true
 
 ##@ Utilities
 

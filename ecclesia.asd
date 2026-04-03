@@ -30,6 +30,9 @@
                                  (:file "raspi4b")
                                  (:file "raspi3b")))
                    (:file "aarch64")))
+     (:module "loader"
+      :components ((:file "elf")
+                   (:file "elf-x86_64")))
      (:file "main")))))
 
 (defsystem ecclesia/test
@@ -40,4 +43,5 @@
   ((:module "test"
     :components ((:file "bootloader")
                  (:file "stage2")
-                 (:file "main")))))
+                 (:file "main")
+                 (:file "floppy")))))

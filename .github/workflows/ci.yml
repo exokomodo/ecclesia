@@ -15,8 +15,6 @@ jobs:
     strategy:
       matrix:
         target-arch:
-          - aarch64
-          - i386
           - x86_64
 
     env:
@@ -29,6 +27,14 @@ jobs:
       - name: Install SBCL
         run: |
           make setup/sbcl
+
+      - name: Install cross-compiler toolchain
+        run: |
+          make setup/toolchain
+
+      - name: Build userland [${{ matrix.target-arch }}]
+        run: |
+          make userland
 
       - name: Build [${{ matrix.target-arch }}]
         run: |

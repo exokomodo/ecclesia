@@ -4,3 +4,6 @@
 (require 'asdf)
 (pushnew (truename "./") asdf:*central-registry* :test #'equal)
 (asdf:load-system :ecclesia/test)
+
+(in-package #:ecclesia-test)
+(ecclesia-test::run-floppy-tests)

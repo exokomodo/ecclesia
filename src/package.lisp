@@ -5,7 +5,6 @@
 ;;;; ecclesia.boot          — boot code
 ;;;; ecclesia.kernel        — ISA-agnostic kernel generics
 ;;;; ecclesia.kernel.x86_64 — x86_64 implementations of the kernel generics
-;;;; ecclesia.kernel.i386   — i386 (32-bit) implementations of the kernel generics
 ;;;; ecclesia               — kernel image definitions (*kernel-main*, etc.)
 
 (defpackage #:ecclesia.utils
@@ -113,7 +112,8 @@
    ;; Assembler meta-generics
    #:asm-prelude-forms
    #:unconditional-jump-forms
-   #:print-prompt-forms))
+   #:print-prompt-forms
+   #:isa-supports-elf-loader-p))
 
 (defpackage #:ecclesia.kernel.x86-base
   (:use #:cl
@@ -156,6 +156,24 @@
         #:ecclesia.utils)
   (:export #:aarch64))
 
+(defpackage #:ecclesia.loader
+  (:use #:cl
+        #:ecclesia.assembler
+        #:ecclesia.kernel
+        #:ecclesia.kernel.x86-base)
+  (:export #:load-elf-forms
+           #:+elf-magic+
+           #:+elf64-e-entry+
+           #:+elf64-e-phoff+
+           #:+elf64-e-phentsize+
+           #:+elf64-e-phnum+
+           #:+ph64-p-type+
+           #:+ph64-p-offset+
+           #:+ph64-p-vaddr+
+           #:+ph64-p-filesz+
+           #:+ph64-p-memsz+
+           #:+pt-load+))
+
 (defpackage #:ecclesia
   (:use #:cl
         #:ecclesia.assembler
@@ -166,6 +184,7 @@
         #:ecclesia.kernel.x86_64
         #:ecclesia.kernel.i386
         #:ecclesia.kernel.aarch64
+        #:ecclesia.loader
         #:ecclesia.utils)
   (:export
    ;; Kernel image builder — call with an ISA instance or use *build-target*

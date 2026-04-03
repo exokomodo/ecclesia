@@ -89,18 +89,50 @@
            (format t "[ecclesia] Writing ~a (~d bytes / 1.44MB)...~%~%"
                    output-path +floppy-total-size+)
 
-           (with-open-file (out output-path
-                                :direction :output
-                                :element-type '(unsigned-byte 8)
-                                :if-exists :supersede)
-             (write-sequence stage1 out)
-             (write-sequence stage2 out)
-             (loop repeat (- +stage2-size+ (length stage2)) do (write-byte 0 out))
-             (write-sequence kernel out)
-             (loop repeat (- +floppy-total-size+ content-size) do (write-byte 0 out)))
+           ;; ── Load ELF binary if available ─────────────────────────────
+           ;; Sector 18+ (after 1 MBR + 8 Stage2 + 8 kernel = sector 17)
+           (let* ((elf-path (format nil "build/hello-~a.elf" target-arch))
+                  (_ (format t "[ecclesia] ELF path: ~a -> ~a~%"
+                             elf-path (if (probe-file elf-path) "FOUND" "NOT FOUND")))
+                  (elf-bytes (when (probe-file elf-path)
+                               (with-open-file (f elf-path
+                                                  :element-type '(unsigned-byte 8))
+                                 (let ((buf (make-array (file-length f)
+                                                        :element-type '(unsigned-byte 8))))
+                                   (read-sequence buf f)
+                                   buf))))
+                  (elf-sector-size (* 16 +floppy-sector-size+))  ; 8KB reserved
+                  (elf-padded (pad-to-sector (or elf-bytes #()))))
 
-           (format t "[ecclesia] Done.~%")
-           (format t "  Stage 1: ~4d bytes~%" (length stage1))
-           (format t "  Stage 2: ~4d bytes~%" (length stage2))
-           (format t "  Kernel:  ~4d bytes~%" (length kernel))
-           (format t "  Total:   ~4d bytes~%" +floppy-total-size+)))))))
+             (when elf-bytes
+               (format t "[ecclesia] Embedding ~a (~d bytes) at sector 18...~%"
+                       elf-path (length elf-bytes)))
+
+             (with-open-file (out output-path
+                                  :direction :output
+                                  :element-type '(unsigned-byte 8)
+                                  :if-exists :supersede)
+               (write-sequence stage1 out)
+               (write-sequence stage2 out)
+               (loop repeat (- +stage2-size+ (length stage2)) do (write-byte 0 out))
+               (write-sequence kernel out)
+               ;; Pad up to sector 18 (after kernel area)
+               (let ((kernel-area (- (* 17 +floppy-sector-size+)
+                                     (+ +floppy-sector-size+ +stage2-size+))))
+                 (loop repeat (- kernel-area (length kernel)) do (write-byte 0 out)))
+               ;; Write ELF (padded to 8KB), or zeros if not built yet
+               (write-sequence elf-padded out)
+               (loop repeat (- elf-sector-size (length elf-padded)) do (write-byte 0 out))
+               ;; Zero-pad rest of floppy
+               (let ((written (+ +floppy-sector-size+ +stage2-size+
+                                 (* 8 +floppy-sector-size+)   ; kernel area
+                                 elf-sector-size)))
+                 (loop repeat (- +floppy-total-size+ written) do (write-byte 0 out))))
+
+             (format t "[ecclesia] Done.~%")
+             (format t "  Stage 1:  ~4d bytes~%" (length stage1))
+             (format t "  Stage 2:  ~4d bytes~%" (length stage2))
+             (format t "  Kernel:   ~4d bytes~%" (length kernel))
+             (when elf-bytes
+               (format t "  ELF:      ~4d bytes~%" (length elf-bytes)))
+             (format t "  Total:    ~4d bytes~%" +floppy-total-size+))))))))

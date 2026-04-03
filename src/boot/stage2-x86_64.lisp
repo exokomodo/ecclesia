@@ -51,6 +51,14 @@
     (mov  ecx #x400)        ; 4096 / 4 = 1024 dwords
     (rep  movsd)
 
+
+    ;; ── Copy ELF binary from 0x30000 → 0x300000 ──────────────────────────
+    ;; Stage 2 loaded 16 sectors (8192 bytes) at physical 0x30000 (real mode).
+    (mov  esi #x30000)
+    (mov  edi #x300000)
+    (mov  ecx #x800)        ; 8192 / 4 = 2048 dwords
+    (rep  movsd)
+
     ;; Enable PAE (CR4 bit 5)
     (mov  eax cr4)
     (or   eax #x20)
@@ -82,6 +90,20 @@
     (bits 16)
     (org  #x8000)
     ,@(real-mode-init-forms)
+
+    ;; ── Load ELF binary into 0x30000 (real mode, before PM switch) ───────────
+    ;; Sectors 18-33 (16 sectors = 8KB), ES:BX = 0x3000:0x0000
+    (mov  ax #x3000)
+    (mov  es ax)
+    (mov  ah #x02)
+    (mov  al #x10)       ; 16 sectors = 8KB
+    (mov  ch #x00)
+    (mov  cl #x12)       ; sector 18 (1 MBR + 8 Stage2 + 8 kernel = 17, so 18)
+    (mov  dh #x00)
+    (mov  dl #x00)
+    (mov  bx #x0000)     ; ES:BX = 0x3000:0 = 0x30000
+    (int  #x13)
+    ;; ignore carry — if ELF not present, loader will catch bad magic
 
     ;; ── Load GDT ─────────────────────────────────────────────────────────────
     (lgdt (gdt-ptr))

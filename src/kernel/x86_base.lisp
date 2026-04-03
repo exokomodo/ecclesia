@@ -28,11 +28,13 @@
     (jnc  kbd-main-loop)))
 
 ;;; ── Dispatch to handler ──────────────────────────────────────────────────────
-;;; Compares AL to ASCII 8; branches are mode-neutral.
+;;; Compares AL to ASCII 8 (backspace) and 0x1b (escape); branches are mode-neutral.
 
 (defmethod ecclesia.kernel:dispatch-to-handler-forms ((isa x86-base))
   '((cmp8 al #x08)
     (jz   kbd-backspace)
+    (cmp8 al #x1b)
+    (jz   kbd-escape)
     (jmp  abs kbd-printable)))
 
 ;;; ── Prompt print (VGA) ───────────────────────────────────────────────────────

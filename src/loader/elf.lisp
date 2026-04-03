@@ -27,7 +27,7 @@
 ;;;;   0x28  p_memsz        bytes in memory (memsz-filesz = BSS)
 ;;;;
 ;;;; The loader assumes:
-;;;;   - ELF image base is in RSI (x86-64) or X20 (aarch64)
+;;;;   - ELF image base is in RSI (x86-64)
 ;;;;   - Segments are PT_LOAD (type=1); others are skipped
 ;;;;   - No dynamic linking / relocations needed (static ELF)
 ;;;;

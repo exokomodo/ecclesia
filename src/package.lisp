@@ -70,7 +70,6 @@
    #:*boot-message*
    #:*stage2*
    #:*stage2-i386*
-      #:*stage2-aarch64*
    #:stage2-size
    #:page-table-forms
    #:long-mode-entry-forms))
@@ -135,27 +134,6 @@
         #:ecclesia.utils)
   (:export #:i386))
 
-(defpackage #:ecclesia.kernel.board
-  (:use #:cl)
-  (:export #:board
-           #:make-board
-           #:board-uart-base
-           #:board-qemu-machine
-           #:board-qemu-cpu
-           #:board-kernel-load-address
-           #:board-stack-top
-           ;; Board classes
-           #:qemu-virt
-           #:raspi4b
-           #:raspi3b))
-
-(defpackage #:ecclesia.kernel.aarch64
-  (:use #:cl
-        #:ecclesia.kernel
-        #:ecclesia.kernel.board
-        #:ecclesia.utils)
-  (:export #:aarch64))
-
 (defpackage #:ecclesia.loader
   (:use #:cl
         #:ecclesia.assembler
@@ -179,11 +157,9 @@
         #:ecclesia.assembler
         #:ecclesia.boot
         #:ecclesia.kernel
-        #:ecclesia.kernel.board
         #:ecclesia.kernel.x86-base
         #:ecclesia.kernel.x86_64
         #:ecclesia.kernel.i386
-        #:ecclesia.kernel.aarch64
         #:ecclesia.loader
         #:ecclesia.utils)
   (:export

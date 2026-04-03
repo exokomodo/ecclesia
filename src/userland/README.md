@@ -40,7 +40,6 @@ Each program lives in its own folder:
 src/userland/<name>/
   <name>.c          — C source (no libc, no stdlib)
   <name>-x86_64.ld  — linker script for x86-64
-  <name>-aarch64.ld — linker script for AArch64
 ```
 
 ### Linker Scripts
@@ -50,7 +49,6 @@ The linker script defines where the program loads in virtual memory. Each arch h
 | ISA      | Load address | Rationale                              |
 |----------|-------------|----------------------------------------|
 | x86_64   | `0x400000`  | 4MB — above kernel at `0x100000`       |
-| AArch64  | `0x41000000`| Just above kernel at `0x40000000`      |
 
 The load address must be within the kernel's identity-mapped page tables. For x86_64, Stage 2 maps the first 16MB (0x0 to 0xFFFFFF), so `0x400000` is safely within range.
 
@@ -130,8 +128,6 @@ Also add your target to `userland` and `userland/all`:
 ```makefile
 userland: build/hello-$(TARGET_ARCH).elf build/<name>-$(TARGET_ARCH).elf
 
-userland/all: build/hello-x86_64.elf build/hello-aarch64.elf \
-              build/<name>-x86_64.elf build/<name>-aarch64.elf
 ```
 
 ### Choosing Which ELF to Load
@@ -257,5 +253,3 @@ Currently userland runs with full access to all memory — it can overwrite the 
 ### Shared libraries
 Static linking means every program carries its own copy of any shared code. A dynamic linker (`.interp` section, `ld-ecclesia.so`) would allow shared routines and smaller programs. This requires a much more complex loader.
 
-### AArch64 userland
-The AArch64 kernel uses UART for I/O instead of VGA. A userland program targeting AArch64 should write to the PL011 UART at `0x09000000` (QEMU virt) or `0xFE201000` (RPi4) rather than the VGA buffer. The `hello-aarch64.ld` linker script is in place; the C source needs to be updated to use UART writes for AArch64 targets.

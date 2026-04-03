@@ -19,32 +19,38 @@
 (defconstant +elf-offset+    (* 17 +sector+))   ; sector 18, 0-indexed offset 17*512
 (defconstant +elf-magic+     #x7f)              ; first byte of ELF magic
 
+(defun floppy-image-path ()
+  "Return the path of the built floppy image for the current TARGET_ARCH, or NIL."
+  (let* ((arch (or (sb-ext:posix-getenv "TARGET_ARCH") "x86_64"))
+         (path (format nil "build/ecclesia-~a.img" arch)))
+    (when (probe-file path) path)))
+
 (defun build-floppy ()
-  "Assemble a complete x86_64 floppy image in memory and return it as a byte vector."
-  (let* ((stage1  (assemble *bootloader*))
-         (stage2  (let ((s (assemble *stage2*)))
-                    (let ((padded (make-array (* 4 +sector+)
-                                             :element-type '(unsigned-byte 8)
-                                             :initial-element 0)))
-                      (replace padded s)
-                      padded)))
-         (kernel  (let ((k (assemble (make-kernel-main))))
-                    (let ((padded (make-array (* 8 +sector+)
-                                             :element-type '(unsigned-byte 8)
-                                             :initial-element 0)))
-                      (replace padded k)
-                      padded)))
-         (total   (* 2880 +sector+))
-         (img     (make-array total :element-type '(unsigned-byte 8)
-                                    :initial-element 0)))
-    (replace img stage1 :start1 0)
-    (replace img stage2 :start1 +stage2-offset+)
-    (replace img kernel :start1 +kernel-offset+)
-    img))
+  "Load built floppy image from disk (includes ELF). Falls back to in-memory assembly."
+  (let ((path (floppy-image-path)))
+    (if path
+        (with-open-file (f path :element-type '(unsigned-byte 8))
+          (let ((buf (make-array (file-length f) :element-type '(unsigned-byte 8))))
+            (read-sequence buf f)
+            buf))
+        (let* ((stage1 (assemble *bootloader*))
+               (stage2 (let ((s (assemble *stage2*)))
+                         (let ((p (make-array (* 4 +sector+) :element-type '(unsigned-byte 8) :initial-element 0)))
+                           (replace p s) p)))
+               (kernel (let ((k (assemble (make-kernel-main))))
+                         (let ((p (make-array (* 8 +sector+) :element-type '(unsigned-byte 8) :initial-element 0)))
+                           (replace p k) p)))
+               (img    (make-array (* 2880 +sector+) :element-type '(unsigned-byte 8) :initial-element 0)))
+          (replace img stage1 :start1 0)
+          (replace img stage2 :start1 +stage2-offset+)
+          (replace img kernel :start1 +kernel-offset+)
+          img))))
 
 (defun run-floppy-tests ()
   (format t "~%Running floppy image layout tests...~%~%")
-  (let ((img (build-floppy)))
+  (let* ((path (floppy-image-path))
+         (_ (when path (format t "  INFO  Using built image: ~a~%" path)))
+         (img (build-floppy)))
 
     ;; ── Sector boundaries ────────────────────────────────────────────────
     (assert= +sector+ +stage2-offset+

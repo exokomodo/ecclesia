@@ -16,6 +16,19 @@
     (org  #x8000)
     ,@(real-mode-init-forms)
 
+    ;; ── Load ELF binary into 0x30000 before entering PM ─────────────────────
+    (mov  ax #x3000)
+    (mov  es ax)
+    (mov  ah #x02)
+    (mov  al #x10)       ; 16 sectors = 8KB
+    (mov  ch #x00)
+    (mov  cl #x12)       ; sector 18
+    (mov  dh #x00)
+    (mov  dl #x00)
+    (mov  bx #x0000)
+    (int  #x13)
+    ;; ignore carry — loader checks ELF magic
+
     ;; ── Enable A20 ───────────────────────────────────────────────────────────
     ,@(a20-enable-forms)
 
@@ -40,6 +53,12 @@
     (bits 32)
     (label pm-entry)
     ,@(setup-pm-segments-forms #x90000)
+
+    ;; ── Copy ELF from 0x30000 → 0x300000 ────────────────────────────────────
+    (mov  esi #x30000)
+    (mov  edi #x300000)
+    (mov  ecx #x800)        ; 8192 / 4 = 2048 dwords
+    (rep  movsd)
 
     ;; ── Clear screen ─────────────────────────────────────────────────────────
     ,@(vga-clear-forms)

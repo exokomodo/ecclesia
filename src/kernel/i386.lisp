@@ -105,6 +105,8 @@
 (defmethod ecclesia.kernel:make-kernel-isa ((target (eql :i386)))
   (make-instance 'i386))
 
+(defmethod ecclesia.kernel:isa-supports-elf-loader-p ((isa i386)) t)
+
 (defmethod ecclesia.kernel:isa-bits ((isa i386))          32)
 (defmethod ecclesia.kernel:isa-origin ((isa i386))        #x20000)
 (defmethod ecclesia.kernel:isa-stack-pointer ((isa i386)) #x90000)

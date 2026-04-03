@@ -368,8 +368,10 @@
 ;;; ── ADD ──────────────────────────────────────────────────────────────────────
 
 (definsn add (args mode)
-         (cond ((and (r32-p (first args)) (r32-p (second args))) 2)
-               ((and (r64-p (first args)) (r64-p (second args))) 3)  ; REX.W + 0x01
+         (cond ((and (r32-p (first args)) (r32-p (second args)))    2)
+               ((and (r64-p (first args)) (r64-p (second args)))    3)
+               ((and (r32-p (first args)) (numberp (second args)))  6)  ; ADD r32, imm32
+               ((and (r64-p (first args)) (r64-p  (second args)))   3)
                (t (error "Unknown ADD form: ~a ~a" (first args) (second args))))
          (args labels origin buf mode)
   (let ((dst (first args)) (src (second args)))
@@ -378,6 +380,10 @@
        (push-byte buf #x48)   ; REX.W
        (push-byte buf #x01)
        (push-byte buf (logior #xc0 (ash (enc *r64* src) 3) (enc *r64* dst))))
+      ((and (r32-p dst) (numberp src))
+       (push-byte buf #x81)
+       (push-byte buf (logior #xc0 (enc *r32* dst)))
+       (push-u32 buf src))
       (t
        (push-byte buf #x01)
        (push-byte buf (logior #xc0 (ash (enc *r32* src) 3) (enc *r32* dst)))))))
@@ -569,6 +575,16 @@
                (push-byte buf (logior #xe0 (enc *r64* r))))
         (error "JMP-REG requires r64, got ~a" r))))
 
+;;; CALL r32 — indirect call in 32-bit mode (FF /2, no REX)
+(definsn call-reg32 (args mode)
+         2
+         (args labels origin buf mode)
+  (let ((r (first args)))
+    (if (r32-p r)
+        (progn (push-byte buf #xff)
+               (push-byte buf (logior #xd0 (enc *r32* r))))
+        (error "CALL-REG32 requires r32, got ~a" r))))
+
 ;;; CALL r64 — indirect call via register (FF /2)
 (definsn call-reg (args mode)
          2
@@ -647,10 +663,10 @@
 ;;; We'll add MOV r64, [reg+disp32] as mem-load64:
 
 (definsn mem-load32 (args mode)
-  ;; (mem-load32 dst reg off) → MOV dst, [reg+off]
+  ;; (mem-load32 dst reg off) → MOV dst, [reg+disp32] = 6 bytes
   6
   (args labels origin buf mode)
-  (let ((dst (first args))
+  (let ((dst  (first args))
         (base (second args))
         (off  (third args)))
     (cond
@@ -658,7 +674,11 @@
        (push-byte buf #x8b)
        (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) (enc *r64* base)))
        (push-u32 buf off))
-      (t (error "Unknown MEM-LOAD32 form")))))
+      ((and (r32-p dst) (r32-p base))
+       (push-byte buf #x8b)
+       (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) (enc *r32* base)))
+       (push-u32 buf off))
+      (t (error "Unknown MEM-LOAD32 form: ~a ~a" dst base)))))
 
 (definsn mem-load64 (args mode)
   ;; (mem-load64 dst reg off) → REX.W MOV dst, QWORD PTR [reg+disp32] = 7 bytes
@@ -679,5 +699,6 @@
         (base (second args))
         (off  (third args)))
     (push-byte buf #x0f) (push-byte buf #xb7)
-    (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) (enc *r64* base)))
+    (let ((base-enc (if (r64-p base) (enc *r64* base) (enc *r32* base))))
+      (push-byte buf (logior #x80 (ash (enc *r32* dst) 3) base-enc)))
     (push-u32 buf off)))

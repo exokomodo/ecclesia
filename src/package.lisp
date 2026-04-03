@@ -161,7 +161,8 @@
   (:use #:cl
         #:ecclesia.assembler
         #:ecclesia.kernel
-        #:ecclesia.kernel.x86-base)
+        #:ecclesia.kernel.x86-base
+        #:ecclesia.kernel.i386)
   (:export #:load-elf-forms
            #:+elf-magic+
            #:+elf64-e-entry+

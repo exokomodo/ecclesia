@@ -6,7 +6,7 @@ SHELL := /bin/bash
 MAKEFLAGS += --no-print-directory
 
 UNAME_S := $(shell uname -s)
-AVAILABLE_ARCHITECTURES := x86_64 i386
+AVAILABLE_ARCHITECTURES := x86_64
 
 # Variables
 TARGET_ARCH ?= x86_64
@@ -167,8 +167,6 @@ build/hello-x86_64.elf: src/userland/hello/hello.c src/userland/hello/hello-x86_
 	fi
 	@test -f $@ && echo "[ecclesia] Compiled $@ ($$(wc -c < $@) bytes)" || true
 
-build/hello-i386.elf:
-	@echo "[ecclesia] Skipping i386 userland — no ELF loader for i386"
 
 ##@ Utilities
 

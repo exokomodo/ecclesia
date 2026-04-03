@@ -43,4 +43,5 @@
   ((:module "test"
     :components ((:file "bootloader")
                  (:file "stage2")
-                 (:file "main")))))
+                 (:file "main")
+                 (:file "floppy")))))

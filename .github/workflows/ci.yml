@@ -15,8 +15,6 @@ jobs:
     strategy:
       matrix:
         target-arch:
-          - aarch64
-          - i386
           - x86_64
 
     env:

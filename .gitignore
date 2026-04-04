@@ -21,3 +21,7 @@
 *.img
 *.bin
 write-kernel
+
+# AI slop
+.github/skills
+

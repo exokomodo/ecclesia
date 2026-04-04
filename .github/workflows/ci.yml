@@ -24,13 +24,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Install ECL
+        run: |
+          make setup/ecl
+      
       - name: Install SBCL
         run: |
           make setup/sbcl
-
-      - name: Install cross-compiler toolchain
-        run: |
-          make setup/toolchain
 
       - name: Build kernel [${{ matrix.target-arch }}]
         run: |

@@ -33,12 +33,22 @@ SOURCES   := ecclesia.asd $(wildcard src/*.lisp src/*.asm) $(WRITER)
 ##@ Environment Setup
 
 .PHONY: setup
-setup: setup/hooks setup/sbcl setup/qemu setup/toolchain ## Install all development dependencies
+setup: setup/hooks setup/ecl setup/sbcl setup/qemu ## Install all development dependencies
 
 .PHONY: setup/hooks
 setup/hooks: ## Install git hooks
 	ln -sf "$(PWD)/git/hooks/pre-commit" .git/hooks/pre-commit
 	@echo "✅ Git hooks installed"
+
+.PHONY: setup/ecl
+setup/ecl: ## Install ECL (Embeddable Common Lisp)
+ifeq ($(UNAME_S),Linux)
+	sudo apt update && sudo apt install -y ecl
+else ifeq ($(UNAME_S),Darwin)
+	brew install ecl
+else
+	$(error "Unsupported OS: $(UNAME_S). Please install ECL manually.")
+endif
 
 .PHONY: setup/sbcl
 setup/sbcl: ## Install SBCL
@@ -58,22 +68,6 @@ else ifeq ($(UNAME_S),Darwin)
 	brew install qemu
 else
 	$(error "Unsupported OS: $(UNAME_S). Please install QEMU manually.")
-endif
-
-.PHONY: setup/toolchain
-setup/toolchain: ## Install cross-compilers for supported architectures
-ifeq ($(UNAME_S),Linux)
-	sudo apt update && sudo apt install -y \
-	    gcc \
-	    gcc-x86-64-linux-gnu \
-	    binutils-x86-64-linux-gnu
-	@echo "✅ Cross-compilers installed"
-else ifeq ($(UNAME_S),Darwin)
-	brew install x86_64-elf-gcc 2>/dev/null || \
-	brew install x86_64-elf-binutils
-	@echo "✅ Cross-compilers installed (via Homebrew)"
-else
-	$(error "Unsupported OS: $(UNAME_S). Please install cross-compilers manually.")
 endif
 
 ##@ Development Tasks

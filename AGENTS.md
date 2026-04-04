@@ -36,8 +36,6 @@
 
 ## Pull Request And Commit Conventions
 
-- Prefer conventional commit format for PR titles and commits: `type: description`.
-- Common types in this repo include `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`, and `perf:`.
-- Use lowercase, imperative descriptions such as `fix: validate ELF entry point`.
+- Use lowercase, imperative descriptions such as `<issue number>: validate ELF entry point`.
 - Include the issue number in the PR body when applicable, for example `Closes #40`.
 - Prefer short, descriptive branch names. If work is tied to an issue, include the issue number when practical.

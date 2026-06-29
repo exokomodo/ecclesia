@@ -1,0 +1,256 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-01T01:27:30.139Z",
+  "entries": {
+    "memory:memory/2026-03-31.md:1:18": {
+      "key": "memory:memory/2026-03-31.md:1:18",
+      "path": "memory/2026-03-31.md",
+      "startLine": 1,
+      "endLine": 18,
+      "source": "memory",
+      "snippet": "### Key Actions #### Open Graph Meta Tags for Discord/Social Previews - Implemented Open Graph (OG) meta tags for Autobutler blog posts and pages (#84). - Added dynamic OG tags to `pages/blogs/[...slug].vue` for each blog post. - Included `article:published_time`, `article:author`, `og:image`. - Enhanced `pages/blogs/index.vue` with OG tags for the blog index page. - Set global OG defaults in `nuxt.config.ts`: - `og:site_name`, `og:image`, `og:url`, `twitter:card`, `theme-color`, and `description`. #### Resolution of Duplicate PRs - Investigated and resolved duplication between PRs (#85 and Sable's #87): - Cherry-picked structured data and blog index OG metadata from #87 into #85.",
+      "recallCount": 6,
+      "dailyCount": 0,
+      "totalScore": 3.945453282516688,
+      "maxScore": 0.7286122967961547,
+      "firstRecalledAt": "2026-04-10T05:45:09.526Z",
+      "lastRecalledAt": "2026-05-19T12:03:49.097Z",
+      "queryHashes": [
+        "5459c23c16bc",
+        "40253958b010",
+        "effe18eeabde",
+        "d5e6d9c78dcc",
+        "d0417d7b24db",
+        "32ecee64c5ec"
+      ],
+      "recallDays": [
+        "2026-04-09",
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "discord/social",
+        "pages/blogs",
+        "published-time",
+        "pages/blogs/index.vue",
+        "nuxt.config.ts",
+        "site-name",
+        "theme-color",
+        "cherry-picked"
+      ]
+    },
+    "memory:memory/2026-03-30.md:54:72": {
+      "key": "memory:memory/2026-03-30.md:54:72",
+      "path": "memory/2026-03-30.md",
+      "startLine": 54,
+      "endLine": 72,
+      "source": "memory",
+      "snippet": "- Mnemonics canonicalized to `ecclesia.build` package at lookup time — instruction forms work from any package ### Open PRs at end of day: - PR #18: `feat/keyboard-input` — keyboard polling + VGA echo (needs kernel copy from floppy to 0x100000 to actually work at runtime) ### Participants: - James (jamesaorson) — directing, reviewing, merging - diatrix — also building a parallel Lisp OS; inspiration/competition ### James confirmed: - I can merge my own Ursinia blog PRs - He uses `make boot-once` (QEMU with `-no-reboot`) for testing ## Notes to self - Stage 2 does not currently copy the kernel from floppy to 0x100000 — was stripped during refactoring. Needs to be added back for the keyboa",
+      "recallCount": 3,
+      "dailyCount": 0,
+      "totalScore": 1.7343139681716886,
+      "maxScore": 0.6207430298336256,
+      "firstRecalledAt": "2026-04-10T05:45:09.526Z",
+      "lastRecalledAt": "2026-04-10T05:45:23.469Z",
+      "queryHashes": [
+        "5459c23c16bc",
+        "40253958b010",
+        "effe18eeabde"
+      ],
+      "recallDays": [
+        "2026-04-09"
+      ],
+      "conceptTags": [
+        "ecclesia.build",
+        "feat/keyboard-input",
+        "inspiration/competition",
+        "boot-once",
+        "no-reboot",
+        "mnemonics",
+        "canonicalized",
+        "package"
+      ]
+    },
+    "memory:memory/2026-05-06.md:1:25": {
+      "key": "memory:memory/2026-05-06.md:1:25",
+      "path": "memory/2026-05-06.md",
+      "startLine": 1,
+      "endLine": 25,
+      "source": "memory",
+      "snippet": "# Memory — 2026-05-06 ## autobutler-org/autobutler activity ### PR #1074 description updated - PR closes issue #922 (Armbian-based OS image build) - Commits by jamesaorson: added armbian-build submodule, --recursive clone, armbian build workflow, submodule ref update, force execution fix - Updated description covers: submodule, workflow (board matrix, Azure upload), release pipeline trigger, provision.sh fixes, full build flow diagram ### Issue #790 (TLS / in-transit encryption) — analysis given - Options discussed: self-signed cert at boot, Let's Encrypt DNS-01, Tailscale/WireGuard overlay, Caddy reverse proxy - Recommendation: Option 1 (self-signed auto-generated) as quick win; Option 4",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.7043064188544579,
+      "maxScore": 0.7043064188544579,
+      "firstRecalledAt": "2026-05-19T12:03:46.945Z",
+      "lastRecalledAt": "2026-05-19T12:03:46.945Z",
+      "queryHashes": [
+        "d0417d7b24db"
+      ],
+      "recallDays": [
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "autobutler-org/autobutler",
+        "armbian-based",
+        "armbian-build",
+        "provision.sh",
+        "in-transit",
+        "self-signed",
+        "dns-01",
+        "tailscale/wireguard"
+      ]
+    },
+    "memory:memory/2026-04-02.md:24:32": {
+      "key": "memory:memory/2026-04-02.md:24:32",
+      "path": "memory/2026-04-02.md",
+      "startLine": 24,
+      "endLine": 32,
+      "source": "memory",
+      "snippet": "3. Verify conformance count stays the same with parallelism enabled 4. Open PR with issue reference (needs an issue number — or open one) ### Key paths - `tests/conformance/Makefile` — main test entry point - `tests/conformance/pyproject.toml` — dev dependencies - `.test-venv/` — local venv with pytest-xdist installed (gitignored) - `CLYTHON_BIN=./clython python3 -m pytest tests/conformance/tests/conformance/ -q --tb=no` — how tests are run manually",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.7268736080516948,
+      "maxScore": 0.7268736080516948,
+      "firstRecalledAt": "2026-05-19T12:03:49.097Z",
+      "lastRecalledAt": "2026-05-19T12:03:49.097Z",
+      "queryHashes": [
+        "32ecee64c5ec"
+      ],
+      "recallDays": [
+        "2026-05-19"
+      ],
+      "conceptTags": [
+        "tests/conformance/makefile",
+        "tests/conformance/pyproject.toml",
+        "test-venv",
+        "pytest-xdist",
+        "clython-bin",
+        "verify",
+        "conformance",
+        "count"
+      ]
+    },
+    "memory:memory/2026-04-02.md:1:30": {
+      "key": "memory:memory/2026-04-02.md:1:30",
+      "path": "memory/2026-04-02.md",
+      "startLine": 1,
+      "endLine": 30,
+      "source": "memory",
+      "snippet": "# Memory — 2026-04-02 ## Clython: work from 2026-03-30 (carried forward) ### PR #175 — modules refactor (MERGED) - Extracted all built-in module factories from `imports.lisp` into `src/modules/<name>.lisp` - `imports.lisp`: 1579 → 270 lines - `src/imports-pkg.lisp` added for package/var declarations (loads before modules subdir) - Load order in `clython.asd`: `imports-pkg` → `modules/*` → `imports` → `eval` - Conformance after merge: 4015 passed, 26 xfailed - Merged by James as commit `0f2095a` ### Branch `parallel-pytest-run` — IN PROGRESS, NOT MERGED - Goal: parallelize pytest conformance suite with `pytest-xdist` (`-n auto`) - `pytest-xdist` installed in `.test-venv` (local venv in rep",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "totalScore": 1.1537683045209306,
+      "maxScore": 0.6293977313148693,
+      "firstRecalledAt": "2026-05-19T12:03:49.097Z",
+      "lastRecalledAt": "2026-06-01T01:27:30.139Z",
+      "queryHashes": [
+        "32ecee64c5ec",
+        "b79e0580c1e9"
+      ],
+      "recallDays": [
+        "2026-05-19",
+        "2026-05-31"
+      ],
+      "conceptTags": [
+        "built-in",
+        "imports.lisp",
+        "src/modules",
+        "src/imports-pkg.lisp",
+        "package/var",
+        "clython.asd",
+        "imports-pkg",
+        "parallel-pytest-run"
+      ]
+    },
+    "memory:memory/2026-04-25.md:15:25": {
+      "key": "memory:memory/2026-04-25.md:15:25",
+      "path": "memory/2026-04-25.md",
+      "startLine": 15,
+      "endLine": 25,
+      "source": "memory",
+      "snippet": "- `DataSheetController._computedValues`: `Map<(int,int), FormulaValue>` populated by `DataSheetInterpreter.interpretSheet` - `displayValueAt(r, c)` for grid display; raw `cellAt(r,c).value` for formula bar — clean separation - `_recompute()` is full-sheet (incremental deferred to future) - Error values (`#REF!`, `#DIV/0!`) rendered in `Theme.colorScheme.error` with medium font weight - Formula bar unchanged — already reads raw value via `activeCellEditingController` ### Repo state (end of day) - `main` has: formula bar UI (#1034), `ab_formula` package (#1056), `data_table` depends on `ab_formula` - PRs open: #1057 (formula engine examples/tests), #1058 (extract package), #1060 (wire into gr",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.6048681491818123,
+      "maxScore": 0.6048681491818123,
+      "firstRecalledAt": "2026-06-01T01:27:30.139Z",
+      "lastRecalledAt": "2026-06-01T01:27:30.139Z",
+      "queryHashes": [
+        "b79e0580c1e9"
+      ],
+      "recallDays": [
+        "2026-05-31"
+      ],
+      "conceptTags": [
+        "full-sheet",
+        "div/0",
+        "theme.colorscheme.error",
+        "ab-formula",
+        "data-table",
+        "examples/tests",
+        "datasheetcontroller",
+        "computedvalues"
+      ]
+    },
+    "memory:memory/2026-05-12.md:1:27": {
+      "key": "memory:memory/2026-05-12.md:1:27",
+      "path": "memory/2026-05-12.md",
+      "startLine": 1,
+      "endLine": 27,
+      "source": "memory",
+      "snippet": "# Memory — 2026-05-12 ## autobutler repo work (afternoon session) ### PR #1093 — feat(#946): govulncheck - Branch: `feat/946-govulncheck` - Rebased onto main (`0ecdd88`) and force-pushed - Final shape: - `Makefile`: `check/lint/go` = `go vet` only; new `check/vuln: check/vuln/backend` target runs `govulncheck ./...` - `setup/gotools`: `govulncheck` installed alongside other Go dev tools - `autobutler-check.yml`: new `autobutler-check-vuln` job (no standalone security workflow) - Standalone `autobutler-security.yml` deleted - User preference: vuln check is NOT part of lint; separate make target + separate CI job ### PR #1095 → superseded by force-push — SBOM fix - Branch: `chore/au",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.5312815354463498,
+      "maxScore": 0.5312815354463498,
+      "firstRecalledAt": "2026-06-01T01:27:30.139Z",
+      "lastRecalledAt": "2026-06-01T01:27:30.139Z",
+      "queryHashes": [
+        "b79e0580c1e9"
+      ],
+      "recallDays": [
+        "2026-05-31"
+      ],
+      "conceptTags": [
+        "feat/946-govulncheck",
+        "force-pushed",
+        "check/lint/go",
+        "check/vuln",
+        "check/vuln/backend",
+        "setup/gotools",
+        "autobutler-check.yml",
+        "autobutler-check-vuln"
+      ]
+    },
+    "memory:memory/2026-03-30.md:1:28": {
+      "key": "memory:memory/2026-03-30.md:1:28",
+      "path": "memory/2026-03-30.md",
+      "startLine": 1,
+      "endLine": 28,
+      "source": "memory",
+      "snippet": "# 2026-03-30 — Ecclesia OS Day ## Summary Spent the full day with James building **Ecclesia** — a Common Lisp microkernel OS targeting x86-64 bare metal. Enormous amount of ground covered. ## Project: Ecclesia - **Repo:** https://github.com/exokomodo/ecclesia - **Concept:** Modern Lisp Machine — microkernel OS written entirely in Common Lisp + minimal assembly. Inspired by yalo (https://github.com/whily/yalo). - **Name origin:** James suggested naming it after Church (Alonzo Church, lambda calculus). \"Ecclesia\" = Latin for \"church/assembly.\" ### Boot chain achieved (fully working in QEMU): 1. Stage 1 MBR (16-bit real mode) → prints \"Ecclesia booting...\", loads Stage 2 2. Stage 2 → 32-bit",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "totalScore": 0.51661649858527,
+      "maxScore": 0.51661649858527,
+      "firstRecalledAt": "2026-06-01T01:27:30.139Z",
+      "lastRecalledAt": "2026-06-01T01:27:30.139Z",
+      "queryHashes": [
+        "b79e0580c1e9"
+      ],
+      "recallDays": [
+        "2026-05-31"
+      ],
+      "conceptTags": [
+        "x86-64",
+        "github.com/exokomodo/ecclesia",
+        "github.com/whily/yalo",
+        "church/assembly",
+        "16-bit",
+        "32-bit",
+        "ecclesia",
+        "day"
+      ]
+    }
+  }
+}
